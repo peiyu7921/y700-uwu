@@ -1,0 +1,335 @@
+From 5c07742d758b380a4ed771a434886d8c50549819 Mon Sep 17 00:00:00 2001
+From: elden local <local@localhost>
+Date: Mon, 9 Nov 2026 12:35:26 +0800
+Subject: [PATCH 1/2] local: charging control, bypass charging, GAPPS gate,
+ torch LED perms
+
+---
+ device.mk                                     | 18 ++++-
+ init/ueventd.qcom.rc                          | 19 +++++
+ power/Android.bp                              | 18 +++++
+ power/AndroidManifest.xml                     | 25 ++++++
+ power/res/values/strings.xml                  |  7 ++
+ power/res/values/styles.xml                   | 10 +++
+ power/res/xml/power_settings.xml              |  9 +++
+ .../powersettings/PowerSettingsActivity.java  | 76 +++++++++++++++++++
+ sepolicy/vendor/hal_lineage_health_default.te |  7 ++
+ uwu_elden.mk                                  |  2 +
+ 10 files changed, 188 insertions(+), 3 deletions(-)
+ create mode 100644 power/Android.bp
+ create mode 100644 power/AndroidManifest.xml
+ create mode 100644 power/res/values/strings.xml
+ create mode 100644 power/res/values/styles.xml
+ create mode 100644 power/res/xml/power_settings.xml
+ create mode 100644 power/src/org/lineageos/elden/powersettings/PowerSettingsActivity.java
+ create mode 100644 sepolicy/vendor/hal_lineage_health_default.te
+
+diff --git a/device.mk b/device.mk
+index c8228fe..eda7177 100644
+--- a/device.mk
++++ b/device.mk
+@@ -182,9 +182,17 @@ PRODUCT_PACKAGES += \
+ PRODUCT_PACKAGES += \
+     vendor.lineage.health-service.default
+ 
+-$(call soong_config_set,lineage_health,charging_control_charging_path,/sys/class/power_supply/battery/battery_maintenance20)
+-$(call soong_config_set,lineage_health,charging_control_charging_enabled,0)
+-$(call soong_config_set,lineage_health,charging_control_charging_disabled,1)
++# Charging control
++#
++# battery_maintenance20 exposes POWER_SUPPLY_PROP_BATTERY_MAINTENANCE20, i.e. Lenovo's
++# "battery care at 20%" limiter. It is not a charge switch, so wiring it up here made the
++# charging control (and bypass charging) a no-op. The real toggle is charging_enable
++# (POWER_SUPPLY_PROP_BATTERY_CHARGING_ENABLE): 1 = charging allowed, 0 = charging
++# suspended while the device keeps running off the adapter (bypass charging).
++$(call soong_config_set,lineage_health,charging_control_charging_path,/sys/class/power_supply/battery/charging_enable)
++$(call soong_config_set,lineage_health,charging_control_charging_enabled,1)
++$(call soong_config_set,lineage_health,charging_control_charging_disabled,0)
++$(call soong_config_set,lineage_health,charging_control_supports_bypass,true)
+ 
+ # Media
+ PRODUCT_PACKAGES += \
+@@ -244,6 +252,10 @@ PRODUCT_SOONG_NAMESPACES += \
+ # Storage
+ $(call inherit-product, $(SRC_TARGET_DIR)/product/emulated_storage.mk)
+ 
++# Power
++PRODUCT_PACKAGES += \
++    EldenPowerSettings
++
+ # Touch
+ PRODUCT_PACKAGES += \
+     EldenTouchSettings \
+diff --git a/init/ueventd.qcom.rc b/init/ueventd.qcom.rc
+index 96f54ec..5c4f640 100644
+--- a/init/ueventd.qcom.rc
++++ b/init/ueventd.qcom.rc
+@@ -60,6 +60,8 @@
+ 
+ # Battery
+ /sys/class/power_supply/battery battery_maintenance20 0660 system system
++# charging_enable is the real charge switch consumed by vendor.lineage.health
++/sys/class/power_supply/battery charging_enable    0660 system system
+ 
+ 
+ # Firmware directory Path
+@@ -459,6 +461,23 @@ subsystem mem_buf_vm
+ /sys/class/leds/blue     repeat       0640    system    system
+ /sys/class/leds/blue     hw_pattern   0640    system    system
+ 
++# Camera flash / torch LEDs (PM8550). camx drives these through cam_flash ioctls in
++# kernel space, but expose them writable as well so the LED nodes are usable from
++# userspace (torch strength, vendor tooling) instead of staying root-only.
++/sys/class/leds/led:torch_0    brightness     0660    system    system
++/sys/class/leds/led:torch_1    brightness     0660    system    system
++/sys/class/leds/led:torch_2    brightness     0660    system    system
++/sys/class/leds/led:torch_3    brightness     0660    system    system
++/sys/class/leds/led:flash_0    brightness     0660    system    system
++/sys/class/leds/led:flash_1    brightness     0660    system    system
++/sys/class/leds/led:flash_2    brightness     0660    system    system
++/sys/class/leds/led:flash_3    brightness     0660    system    system
++/sys/class/leds/led:flash_0    flash_strobe   0660    system    system
++/sys/class/leds/led:flash_1    flash_strobe   0660    system    system
++/sys/class/leds/led:flash_2    flash_strobe   0660    system    system
++/sys/class/leds/led:flash_3    flash_strobe   0660    system    system
++/sys/class/leds/led:switch_2   brightness     0660    system    system
++
+ #Haptics class devices
+ /sys/class/qcom-haptics    visense_enabled     0400    system    system
+ /sys/class/qcom-haptics    primitive_duration  0600    system    system
+diff --git a/power/Android.bp b/power/Android.bp
+new file mode 100644
+index 0000000..3acfede
+--- /dev/null
++++ b/power/Android.bp
+@@ -0,0 +1,18 @@
++//
++// SPDX-FileCopyrightText: The LineageOS Project
++// SPDX-License-Identifier: Apache-2.0
++//
++
++android_app {
++    name: "EldenPowerSettings",
++    srcs: ["src/**/*.java"],
++    static_libs: [
++        "SettingsLibCollapsingToolbarBaseActivity",
++        "SettingsLibPreference",
++        "vendor.lineage.health-V2-java",
++    ],
++    platform_apis: true,
++    certificate: "platform",
++    privileged: true,
++    system_ext_specific: true,
++}
+diff --git a/power/AndroidManifest.xml b/power/AndroidManifest.xml
+new file mode 100644
+index 0000000..73b402d
+--- /dev/null
++++ b/power/AndroidManifest.xml
+@@ -0,0 +1,25 @@
++<?xml version="1.0" encoding="utf-8"?>
++<manifest xmlns:android="http://schemas.android.com/apk/res/android"
++    package="org.lineageos.elden.powersettings">
++
++    <application
++        android:label="@string/power_settings_title"
++        android:supportsRtl="true"
++        android:theme="@style/Theme.EldenPowerSettings">
++        <activity
++            android:name=".PowerSettingsActivity"
++            android:exported="false"
++            android:label="@string/power_settings_title">
++            <intent-filter>
++                <action android:name="com.android.settings.action.EXTRA_SETTINGS" />
++                <category android:name="android.intent.category.DEFAULT" />
++            </intent-filter>
++            <meta-data
++                android:name="com.android.settings.category"
++                android:value="com.android.settings.category.ia.battery" />
++            <meta-data
++                android:name="com.android.settings.profile"
++                android:value="primary_profile_only" />
++        </activity>
++    </application>
++</manifest>
+diff --git a/power/res/values/strings.xml b/power/res/values/strings.xml
+new file mode 100644
+index 0000000..ea0dda0
+--- /dev/null
++++ b/power/res/values/strings.xml
+@@ -0,0 +1,7 @@
++<?xml version="1.0" encoding="utf-8"?>
++<resources>
++    <string name="power_settings_title">Charging</string>
++    <string name="charging_bypass_title">Bypass charging</string>
++    <string name="charging_bypass_summary">Stop charging the battery and run straight from the adapter. Useful while gaming on a full battery.</string>
++    <string name="charging_bypass_unavailable">Charging control is not available on this build</string>
++</resources>
+diff --git a/power/res/values/styles.xml b/power/res/values/styles.xml
+new file mode 100644
+index 0000000..30cdfdc
+--- /dev/null
++++ b/power/res/values/styles.xml
+@@ -0,0 +1,10 @@
++<?xml version="1.0" encoding="utf-8"?>
++<!--
++    SPDX-FileCopyrightText: The LineageOS Project
++    SPDX-License-Identifier: Apache-2.0
++-->
++<resources>
++    <style name="Theme.EldenPowerSettings" parent="Theme.SubSettingsBase">
++        <item name="preferenceTheme">@style/PreferenceTheme.SettingsLib</item>
++    </style>
++</resources>
+diff --git a/power/res/xml/power_settings.xml b/power/res/xml/power_settings.xml
+new file mode 100644
+index 0000000..378bcd1
+--- /dev/null
++++ b/power/res/xml/power_settings.xml
+@@ -0,0 +1,9 @@
++<?xml version="1.0" encoding="utf-8"?>
++<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
++
++    <SwitchPreferenceCompat
++        android:key="elden_charging_bypass"
++        android:title="@string/charging_bypass_title"
++        android:summary="@string/charging_bypass_summary"
++        android:defaultValue="false" />
++</PreferenceScreen>
+diff --git a/power/src/org/lineageos/elden/powersettings/PowerSettingsActivity.java b/power/src/org/lineageos/elden/powersettings/PowerSettingsActivity.java
+new file mode 100644
+index 0000000..90e41f9
+--- /dev/null
++++ b/power/src/org/lineageos/elden/powersettings/PowerSettingsActivity.java
+@@ -0,0 +1,76 @@
++/*
++ * SPDX-FileCopyrightText: The LineageOS Project
++ * SPDX-License-Identifier: Apache-2.0
++ */
++
++package org.lineageos.elden.powersettings;
++
++import android.os.Bundle;
++import android.os.RemoteException;
++import android.os.ServiceManager;
++import android.util.Log;
++
++import androidx.preference.PreferenceFragmentCompat;
++import androidx.preference.SwitchPreferenceCompat;
++
++import com.android.settingslib.collapsingtoolbar.CollapsingToolbarBaseActivity;
++
++import vendor.lineage.health.IChargingControl;
++
++public class PowerSettingsActivity extends CollapsingToolbarBaseActivity {
++    @Override
++    protected void onCreate(Bundle savedInstanceState) {
++        super.onCreate(savedInstanceState);
++        if (savedInstanceState == null) {
++            getSupportFragmentManager().beginTransaction()
++                    .replace(com.android.settingslib.collapsingtoolbar.R.id.content_frame,
++                            new PowerSettingsFragment())
++                    .commit();
++        }
++    }
++
++    public static class PowerSettingsFragment extends PreferenceFragmentCompat {
++        private static final String TAG = "EldenPowerSettings";
++        private static final String KEY_BYPASS = "elden_charging_bypass";
++
++        private IChargingControl mChargingControl;
++        private SwitchPreferenceCompat mBypass;
++
++        @Override
++        public void onCreatePreferences(Bundle savedInstanceState, String rootKey) {
++            setPreferencesFromResource(R.xml.power_settings, null);
++
++            mBypass = findPreference(KEY_BYPASS);
++            if (mBypass == null) {
++                return;
++            }
++
++            mChargingControl = IChargingControl.Stub.asInterface(
++                    ServiceManager.waitForDeclaredService(
++                            IChargingControl.DESCRIPTOR + "/default"));
++            if (mChargingControl == null) {
++                Log.w(TAG, "vendor.lineage.health is not available");
++                mBypass.setEnabled(false);
++                mBypass.setSummary(R.string.charging_bypass_unavailable);
++                return;
++            }
++
++            try {
++                mBypass.setChecked(!mChargingControl.getChargingEnabled());
++            } catch (RemoteException e) {
++                Log.e(TAG, "Unable to read charging state", e);
++            }
++
++            mBypass.setOnPreferenceChangeListener((preference, newValue) -> {
++                boolean bypass = (Boolean) newValue;
++                try {
++                    mChargingControl.setChargingEnabled(!bypass);
++                    return true;
++                } catch (RemoteException e) {
++                    Log.e(TAG, "Unable to toggle charging", e);
++                    return false;
++                }
++            });
++        }
++    }
++}
+diff --git a/sepolicy/vendor/hal_lineage_health_default.te b/sepolicy/vendor/hal_lineage_health_default.te
+new file mode 100644
+index 0000000..03d9774
+--- /dev/null
++++ b/sepolicy/vendor/hal_lineage_health_default.te
+@@ -0,0 +1,7 @@
++# vendor.lineage.health charging control
++#
++# The HAL toggles /sys/class/power_supply/battery/charging_enable, which lives under the
++# battery power supply node tagged sysfs_battery_supply. device/lineage/sepolicy already
++# grants rw_dir_file() on it; this is kept explicit so the dependency is visible from the
++# device tree and survives any upstream reorganisation of those common rules.
++allow hal_lineage_health_default sysfs_battery_supply:file rw_file_perms;
+diff --git a/uwu_elden.mk b/uwu_elden.mk
+index 93682c2..30f1800 100644
+--- a/uwu_elden.mk
++++ b/uwu_elden.mk
+@@ -13,6 +13,8 @@ $(call inherit-product, device/lenovo/elden/device.mk)
+ # Inherit some common uwuAOSP stuff.
+ UWU_DEVICE_TYPE := tablet
+ UWU_SUPPORTS_TELEPHONY := false
++# Ship without Google apps: vendor/uwu/config/pixel.mk only pulls in GMS when this is true.
++WITH_GAPPS := false
+ $(call inherit-product, vendor/uwu/config/common.mk)
+ 
+ PRODUCT_NAME := uwu_elden
+-- 
+2.55.0.windows.2
+
+
+From 7ac5937c034e09cca3e7b06a76d24553083bce80 Mon Sep 17 00:00:00 2001
+From: elden local <local@localhost>
+Date: Wed, 11 Nov 2026 10:47:36 +0800
+Subject: [PATCH 2/2] fix: drop invalid supports_bypass soong_config (bool vs
+ string type)
+
+---
+ device.mk | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/device.mk b/device.mk
+index eda7177..f33d64f 100644
+--- a/device.mk
++++ b/device.mk
+@@ -192,7 +192,6 @@ PRODUCT_PACKAGES += \
+ $(call soong_config_set,lineage_health,charging_control_charging_path,/sys/class/power_supply/battery/charging_enable)
+ $(call soong_config_set,lineage_health,charging_control_charging_enabled,1)
+ $(call soong_config_set,lineage_health,charging_control_charging_disabled,0)
+-$(call soong_config_set,lineage_health,charging_control_supports_bypass,true)
+ 
+ # Media
+ PRODUCT_PACKAGES += \
+-- 
+2.55.0.windows.2
+

@@ -1,0 +1,810 @@
+diff --git a/qcom/opensource/audio-kernel/asoc/codecs/Kbuild b/qcom/opensource/audio-kernel/asoc/codecs/Kbuild
+index 54719ae..a41e696 100644
+--- a/qcom/opensource/audio-kernel/asoc/codecs/Kbuild
++++ b/qcom/opensource/audio-kernel/asoc/codecs/Kbuild
+@@ -284,7 +284,10 @@ ifeq ($(KERNEL_BUILD), 1)
+ 	obj-y	+= wsa884x/
+ 	obj-y	+= wsa883x/
+ 	obj-y	+= rouleur/
+-	obj-y	+= ./
++# sm8750-audio-fix: `obj-y += ./` recurses into itself (./././...) and dies on
++# bolero/.modules.order.cmd with 'missing separator.' The top-level Kbuild
++# already lists asoc/codecs/, so the self-reference is dropped.
++# obj-y += ./
+ endif
+ # Module information used by KBuild framework
+ obj-$(CONFIG_WCD9XXX_CODEC_CORE) += wcd_core_dlkm.o
+diff --git a/qcom/opensource/camera-kernel/Kbuild b/qcom/opensource/camera-kernel/Kbuild
+index 35a5b87..af78127 100644
+--- a/qcom/opensource/camera-kernel/Kbuild
++++ b/qcom/opensource/camera-kernel/Kbuild
+@@ -1,6 +1,10 @@
++# sm8750-rootpath-fix: these only come from the DDK Makefile's KBUILD_OPTIONS,
++# which the kbuild path (M=<abs dir>) never passes; without them the
++# includes below collapse to '/config/...'.
++KERNEL_ROOT := $(srctree)
+ # SPDX-License-Identifier: GPL-2.0-only
+ 
+-CAMERA_KERNEL_ROOT=$(shell pwd)/$(srctree)/$(src)/$(M)
++CAMERA_KERNEL_ROOT=$(src)
+ 
+ CAMERA_COMPILE_TIME = $(shell date)
+ CAMERA_COMPILE_BY = $(shell whoami | sed 's/\\/\\\\/')
+@@ -22,6 +26,7 @@ modules: cam_generated_h
+ cam_include_dirs := $(shell dirname `find $(src) -name '*.h'` | uniq)
+ 
+ ccflags-y :=  $(addprefix -I,$(cam_include_dirs))
++ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include
+ ccflags-y += -I$(srctree)/$(src)
+ ccflags-y += -I$(srctree)/$(src)/include/uapi/camera/
+ 
+diff --git a/qcom/opensource/dataipa/drivers/platform/msm/gsi/Kbuild b/qcom/opensource/dataipa/drivers/platform/msm/gsi/Kbuild
+index e1a7a59..7e2a98b 100644
+--- a/qcom/opensource/dataipa/drivers/platform/msm/gsi/Kbuild
++++ b/qcom/opensource/dataipa/drivers/platform/msm/gsi/Kbuild
+@@ -1,3 +1,8 @@
++# sm8750-missingmod-fix: vendor include roots for this module
++subdir-ccflags-y += -idirafter $(srctree)/../vendor/lenovo/sm8750/include
++subdir-ccflags-y += -idirafter $(srctree)/../vendor/lenovo/sm8750/include/linux
++ccflags-y += -idirafter $(srctree)/../vendor/lenovo/sm8750/include
++ccflags-y += -idirafter $(srctree)/../vendor/lenovo/sm8750/include/linux
+ # SPDX-License-Identifier: GPL-2.0-only
+ 
+ obj-$(CONFIG_GSI) += gsim.o
+diff --git a/qcom/opensource/dataipa/drivers/platform/msm/ipa/Kbuild b/qcom/opensource/dataipa/drivers/platform/msm/ipa/Kbuild
+index 6fcea8b..5a49c72 100644
+--- a/qcom/opensource/dataipa/drivers/platform/msm/ipa/Kbuild
++++ b/qcom/opensource/dataipa/drivers/platform/msm/ipa/Kbuild
+@@ -1,3 +1,8 @@
++# sm8750-missingmod-fix: vendor include roots for this module
++subdir-ccflags-y += -idirafter $(srctree)/../vendor/lenovo/sm8750/include
++subdir-ccflags-y += -idirafter $(srctree)/../vendor/lenovo/sm8750/include/linux
++ccflags-y += -idirafter $(srctree)/../vendor/lenovo/sm8750/include
++ccflags-y += -idirafter $(srctree)/../vendor/lenovo/sm8750/include/linux
+ # SPDX-License-Identifier: GPL-2.0-only
+ 
+ ipam-y += \
+diff --git a/qcom/opensource/datarmnet-ext/aps/Kbuild b/qcom/opensource/datarmnet-ext/aps/Kbuild
+index 0209715..b7c02ca 100644
+--- a/qcom/opensource/datarmnet-ext/aps/Kbuild
++++ b/qcom/opensource/datarmnet-ext/aps/Kbuild
+@@ -1,3 +1,4 @@
++ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include
+ obj-m += rmnet_aps.o
+ ccflags-y := -I$(RMNET_CORE_INC_DIR) \
+              $(call cc-option,-Wno-misleading-indentation)
+diff --git a/qcom/opensource/datarmnet-ext/aps/Kconfig b/qcom/opensource/datarmnet-ext/aps/Kconfig
+index 0126376..b32d6b8 100644
+--- a/qcom/opensource/datarmnet-ext/aps/Kconfig
++++ b/qcom/opensource/datarmnet-ext/aps/Kconfig
+@@ -5,5 +5,5 @@
+ menuconfig RMNET_APS
+     tristate "Rmnet APS support"
+     default m
+-    ---help---
++    help
+         Apps prioritization module for RmNet driver
+diff --git a/qcom/opensource/datarmnet-ext/mem/Kbuild b/qcom/opensource/datarmnet-ext/mem/Kbuild
+index e707c8e..ebfc405 100644
+--- a/qcom/opensource/datarmnet-ext/mem/Kbuild
++++ b/qcom/opensource/datarmnet-ext/mem/Kbuild
+@@ -1,6 +1,7 @@
+ obj-m += rmnet_mem.o
+ 
+ ccflags-y := $(call cc-option,-Wno-misleading-indentation)
++ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include
+         rmnet_mem-y := \
+         rmnet_mem_main.o \
+         rmnet_mem_nl.o \
+diff --git a/qcom/opensource/datarmnet-ext/mem/Kconfig b/qcom/opensource/datarmnet-ext/mem/Kconfig
+index 0c435ac..22c44cf 100644
+--- a/qcom/opensource/datarmnet-ext/mem/Kconfig
++++ b/qcom/opensource/datarmnet-ext/mem/Kconfig
+@@ -5,5 +5,5 @@
+ menuconfig RMNET_MEM
+     tristate "Rmnet MEM  support"
+     default m
+-    ---help---
++    help
+         Memory module for RmNet driver
+diff --git a/qcom/opensource/datarmnet-ext/offload/Kbuild b/qcom/opensource/datarmnet-ext/offload/Kbuild
+index ec29d8a..ac70cb5 100644
+--- a/qcom/opensource/datarmnet-ext/offload/Kbuild
++++ b/qcom/opensource/datarmnet-ext/offload/Kbuild
+@@ -1,3 +1,4 @@
++ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include
+ obj-m += rmnet_offload.o
+ #Need core headers
+ ccflags-y := -I$(RMNET_CORE_INC_DIR) \
+diff --git a/qcom/opensource/datarmnet-ext/offload/Kconfig b/qcom/opensource/datarmnet-ext/offload/Kconfig
+index 13799e3..b2f59dd 100644
+--- a/qcom/opensource/datarmnet-ext/offload/Kconfig
++++ b/qcom/opensource/datarmnet-ext/offload/Kconfig
+@@ -6,5 +6,5 @@ menuconfig RMNET_OFFLOAD
+     tristate "Rmnet offload support"
+     default m
+     depends on RMNET_CORE
+-    ---help---
++    help
+         Offload support for the RmNet driver
+diff --git a/qcom/opensource/datarmnet-ext/perf/Kbuild b/qcom/opensource/datarmnet-ext/perf/Kbuild
+index cee8e16..43eb666 100644
+--- a/qcom/opensource/datarmnet-ext/perf/Kbuild
++++ b/qcom/opensource/datarmnet-ext/perf/Kbuild
+@@ -1,3 +1,4 @@
++ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include
+ obj-m += rmnet_perf.o
+ #Need core headers
+ ccflags-y := -I$(RMNET_CORE_INC_DIR) \
+diff --git a/qcom/opensource/datarmnet-ext/perf/Kconfig b/qcom/opensource/datarmnet-ext/perf/Kconfig
+index c25d92c..0c537a7 100644
+--- a/qcom/opensource/datarmnet-ext/perf/Kconfig
++++ b/qcom/opensource/datarmnet-ext/perf/Kconfig
+@@ -7,5 +7,5 @@ menuconfig RMNET_PERF
+     default m
+     depends on RMNET_CORE
+     depends on RMNET_SHS
+-    ---help---
++    help
+         Performance support for the RmNet driver
+diff --git a/qcom/opensource/datarmnet-ext/perf_tether/Kbuild b/qcom/opensource/datarmnet-ext/perf_tether/Kbuild
+index 19eb271..4cb2043 100644
+--- a/qcom/opensource/datarmnet-ext/perf_tether/Kbuild
++++ b/qcom/opensource/datarmnet-ext/perf_tether/Kbuild
+@@ -1,3 +1,4 @@
++ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include
+ obj-m += rmnet_perf_tether.o
+ #Need core headers
+ ccflags-y := -I$(RMNET_CORE_INC_DIR) \
+diff --git a/qcom/opensource/datarmnet-ext/perf_tether/Kconfig b/qcom/opensource/datarmnet-ext/perf_tether/Kconfig
+index e57deaa..ad1584a 100644
+--- a/qcom/opensource/datarmnet-ext/perf_tether/Kconfig
++++ b/qcom/opensource/datarmnet-ext/perf_tether/Kconfig
+@@ -6,5 +6,5 @@ menuconfig RMNET_PERF_TETHER
+     tristate "Rmnet perf tethering support"
+     default m
+     depends on RMNET_CORE
+-    ---help---
++    help
+         Offload support for the RmNet driver
+diff --git a/qcom/opensource/datarmnet-ext/sch/Kbuild b/qcom/opensource/datarmnet-ext/sch/Kbuild
+index a1fe7c7..bcda4a0 100644
+--- a/qcom/opensource/datarmnet-ext/sch/Kbuild
++++ b/qcom/opensource/datarmnet-ext/sch/Kbuild
+@@ -1,4 +1,5 @@
+ obj-m += rmnet_sch.o
+ ccflags-y := $(call cc-option,-Wno-misleading-indentation)
++ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include
+ rmnet_sch-y := \
+         rmnet_sch_main.o \
+diff --git a/qcom/opensource/datarmnet-ext/sch/Kconfig b/qcom/opensource/datarmnet-ext/sch/Kconfig
+index 8de4c0b..8a34400 100644
+--- a/qcom/opensource/datarmnet-ext/sch/Kconfig
++++ b/qcom/opensource/datarmnet-ext/sch/Kconfig
+@@ -5,5 +5,5 @@
+ menuconfig RMNET_SCH
+     tristate "Rmnet SCH Qdisc support"
+     default m
+-    ---help---
++    help
+         QDisc module for RmNet driver
+diff --git a/qcom/opensource/datarmnet-ext/shs/Kbuild b/qcom/opensource/datarmnet-ext/shs/Kbuild
+index 28dcc12..8d6d693 100644
+--- a/qcom/opensource/datarmnet-ext/shs/Kbuild
++++ b/qcom/opensource/datarmnet-ext/shs/Kbuild
+@@ -1,3 +1,4 @@
++ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include
+ obj-m += rmnet_shs.o
+ #Need core headers
+ ccflags-y := -I$(RMNET_CORE_INC_DIR) \
+diff --git a/qcom/opensource/datarmnet-ext/shs/Kconfig b/qcom/opensource/datarmnet-ext/shs/Kconfig
+index 41b0e08..245df3c 100644
+--- a/qcom/opensource/datarmnet-ext/shs/Kconfig
++++ b/qcom/opensource/datarmnet-ext/shs/Kconfig
+@@ -6,5 +6,5 @@ menuconfig RMNET_SHS
+     tristate "Rmnet SHS driver"
+     default m
+     depends on RMNET_CORE
+-    ---help---
++    help
+         performance mode of rmnet driver
+diff --git a/qcom/opensource/datarmnet-ext/wlan/Kbuild b/qcom/opensource/datarmnet-ext/wlan/Kbuild
+index 517c0e2..acbfece 100644
+--- a/qcom/opensource/datarmnet-ext/wlan/Kbuild
++++ b/qcom/opensource/datarmnet-ext/wlan/Kbuild
+@@ -1,3 +1,4 @@
++ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include
+ obj-m += rmnet_wlan.o
+ ccflags-y := -I$(RMNET_CORE_INC_DIR) \
+ 	$(call cc-option,-Wno-misleading-indentation)
+diff --git a/qcom/opensource/datarmnet-ext/wlan/Kconfig b/qcom/opensource/datarmnet-ext/wlan/Kconfig
+index a10e494..31d3639 100644
+--- a/qcom/opensource/datarmnet-ext/wlan/Kconfig
++++ b/qcom/opensource/datarmnet-ext/wlan/Kconfig
+@@ -6,5 +6,5 @@ menuconfig RMNET_WLAN
+     tristate "Rmnet WLAN support"
+     default m
+     depends on RMNET_CORE
+-    ---help---
++    help
+         WLAN processing module for RmNet driver
+diff --git a/qcom/opensource/datarmnet/core/Kbuild b/qcom/opensource/datarmnet/core/Kbuild
+index 9bfcca3..ba28f15 100644
+--- a/qcom/opensource/datarmnet/core/Kbuild
++++ b/qcom/opensource/datarmnet/core/Kbuild
+@@ -1,3 +1,15 @@
++# sm8750-datarmnet-fix: include paths + trace header path for the kbuild-based build
++# vendor root: <linux/ipc_logging.h>, <soc/qcom/...> live in sm8750/include
++ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include
++ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750-modules/qcom/opensource/datarmnet/core
++ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750-modules/qcom/opensource/dataipa/drivers/platform/msm/include
++ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750-modules/qcom/opensource/dataipa/drivers/platform/msm/include/uapi
++ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750-modules/qcom/opensource/datarmnet-ext/mem
++ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750-modules/qcom/opensource/datarmnet-ext/mem/include
++ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750-modules/qcom/opensource/datarmnet-ext/mem/include/uapi
++ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750-modules/qcom/opensource/datarmnet-ext/mem/include/uapi/linux
++# TRACE_INCLUDE_PATH is resolved relative to common/include/trace/ by define_trace.h
++ccflags-y += -DRMNET_TRACE_INCLUDE_PATH=../../../vendor/lenovo/sm8750-modules/qcom/opensource/datarmnet/core
+ ifneq (, $(filter y, $(CONFIG_ARCH_SUN) $(CONFIG_ARCH_CANOE) $(CONFIG_ARCH_VIENNA) $(CONFIG_ARCH_MONACO) $(CONFIG_ARCH_YUPIK) $(CONFIG_ARCH_BENGAL) $(CONFIG_ARCH_CHORA) $(CONFIG_ARCH_MALABAR) $(CONFIG_ARCH_WAIPIO)))
+ ccflags-y	+= -DRMNET_LA_PLATFORM
+ endif
+diff --git a/qcom/opensource/dsp-kernel/Kbuild b/qcom/opensource/dsp-kernel/Kbuild
+index 5475ab7..b26be4f 100644
+--- a/qcom/opensource/dsp-kernel/Kbuild
++++ b/qcom/opensource/dsp-kernel/Kbuild
+@@ -1,3 +1,9 @@
++# sm8750-dsp-fix: vendor include path for the kbuild-based build
++ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include
++# sm8750-dsp-fix: elden has no CONFIG_ARCH_SUN, so select the trusted variant explicitly
++ccflags-y += -DCONFIG_QCOM_FASTRPC_TRUSTED=1
++# sm8750-dsp-fix: trace header path relative to common/include/trace
++ccflags-y += -DDSP_TRACE_INCLUDE_PATH=../../../vendor/lenovo/sm8750-modules/qcom/opensource/dsp-kernel/dsp
+ # ported from Android.mk
+ $(info within KBUILD file KBUILD_EXTRA_SYMBOLS = $(KBUILD_EXTRA_SYMBOLS))
+ 
+diff --git a/qcom/opensource/eva-kernel/Kbuild b/qcom/opensource/eva-kernel/Kbuild
+index 79dc821..b9d9f4c 100644
+--- a/qcom/opensource/eva-kernel/Kbuild
++++ b/qcom/opensource/eva-kernel/Kbuild
+@@ -1,3 +1,11 @@
++# sm8750-eva-fix: include paths for the kbuild-based build
++OEVA := $(srctree)/../vendor/lenovo/sm8750-modules/qcom/opensource/eva-kernel
++subdir-ccflags-y += -I$(OEVA)/include/uapi/eva
++subdir-ccflags-y += -I$(OEVA)/include/uapi
++subdir-ccflags-y += -I$(OEVA)/include
++subdir-ccflags-y += -I$(OEVA)/msm
++subdir-ccflags-y += -I$(OEVA)/msm/eva
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include
+ # SPDX-License-Identifier: GPL-2.0-only
+ 
+ CONFIG_BUILD_VENDORSI := true
+diff --git a/qcom/opensource/eva-kernel/msm/Kbuild b/qcom/opensource/eva-kernel/msm/Kbuild
+index 5f684ce..23acc23 100644
+--- a/qcom/opensource/eva-kernel/msm/Kbuild
++++ b/qcom/opensource/eva-kernel/msm/Kbuild
+@@ -1,9 +1,37 @@
++# sm8750-eva-fix: include paths for the kbuild-based build
++OEVA := $(srctree)/../vendor/lenovo/sm8750-modules/qcom/opensource/eva-kernel
++# sm8750-eva-root-fix: EVA_ROOT only comes from the DDK Makefile (KBUILD_OPTIONS),
++# so under the kbuild path it is empty and -I$(EVA_ROOT)/msm/eva/ collapses.
++EVA_ROOT := $(src)/..
++
++subdir-ccflags-y += -I$(OEVA)/include/uapi/eva
++subdir-ccflags-y += -I$(OEVA)/include/uapi
++subdir-ccflags-y += -I$(OEVA)/include
++subdir-ccflags-y += -I$(OEVA)/msm
++subdir-ccflags-y += -I$(OEVA)/msm/eva
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include
+ LINUXINCLUDE    += -I$(EVA_ROOT)/include \
+                    -I$(EVA_ROOT)/include/uapi \
+ 				   -I$(EVA_ROOT)/include/uapi/eva
+ 
+ #srctree is /kernel_platform/common/
+ 
++# sm8750-eva-synx-fix: EVA_ROOT only comes from the DDK Makefile, which the kbuild path does
++# not use, so -I$(EVA_ROOT)/../synx-kernel/... expands to nothing. The CONFIG_ARCH_*
++# branches that carry it also never match elden. Add the real paths unconditionally.
++# sm8750-eva-xmod-fix: headers eva-kernel pulls from sibling modules. #include <linux/fastrpc.h>
++# resolves to dsp-kernel/include/linux/, <linux/gunyah/...> to sm8750/include/linux/.
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include/linux
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750-modules/qcom/opensource/dsp-kernel/include
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750-modules/qcom/opensource/dsp-kernel/include/linux
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750-modules/qcom/opensource/dsp-kernel/include/uapi/misc
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750-modules/qcom/opensource/dsp-kernel/include/uapi
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750-modules/qcom/opensource/dsp-kernel/dsp
++
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750-modules/qcom/opensource/synx-kernel/msm/synx
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750-modules/qcom/opensource/synx-kernel/include/uapi/synx/media
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750-modules/qcom/opensource/dsp-kernel/include
++
+ ccflags-y += -I$(EVA_ROOT)/msm/eva/ \
+     -I$(srctree)/drivers/media/platform/msm/synx/
+ 
+diff --git a/qcom/opensource/graphics-kernel/Kbuild b/qcom/opensource/graphics-kernel/Kbuild
+index 698747f..6739154 100644
+--- a/qcom/opensource/graphics-kernel/Kbuild
++++ b/qcom/opensource/graphics-kernel/Kbuild
+@@ -1,5 +1,25 @@
++# sm8750-vendorinc-first: 这些头文件在 common/include 与 vendor/include 里同名且共用同一个
++# include guard，但 common 版是瘦身 GKI 版（如 llcc-qcom.h 缺 LLCC_VIDDEC），
++# 先命中的赢。subdir-ccflags-y 只能追加，改不了顺序，故在 LINUXINCLUDE 上前置。
++LINUXINCLUDE := -I$(srctree)/../vendor/lenovo/sm8750/include $(LINUXINCLUDE)
++# sm8750-vendorinc: vendor headers (<dt-bindings/...>, <linux/soc/qcom/...>,
++# <soc/qcom/...>) all live under sm8750/include
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include/linux
++# sm8750-hw-fence-include: kgsl_sync.c:215 会 #include <msm_hw_fence.h>，该头属于**另一个模块**
++# mm-drivers/hw_fence/include/（上游 bazel 里是跨 ddk_module 依赖，
++# kbuild 侧必须显式 -I）。用 $(srctree) 定位，与上面两条 vendor include 同风格。
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750-modules/qcom/opensource/mm-drivers/hw_fence/include
+ # SPDX-License-Identifier: GPL-2.0-only
+ 
++# sm8750-kernel-src: 本模块走 external_modules 的 ":kbuild" 分支，而 kernel.go 那个分支
++# 只注入 KCPPFLAGS，**不传 KERNEL_SRC**（只有 ":all"/":modules" 分支才传）。
++# 而 Kbuild 第 96 行的 ccflags 用了 -I$(KERNEL_SRC)/drivers/devfreq，
++# 未定义时展开成 -I/drivers/devfreq，导致 governor.h 找不到。
++# srctree 在 M= 模式下已确认指向 GKI common 树，正是该头所在处；
++# 用 ?= 以免覆盖外部传入的值。
++KERNEL_SRC ?= $(srctree)
++
+ KDIR := $(TOP)/kernel_platform/common
+ 
+ ifeq ($(KGSL_PATH),)
+diff --git a/qcom/opensource/mm-drivers/hfi_core/Kbuild b/qcom/opensource/mm-drivers/hfi_core/Kbuild
+index 9e1d02f..09ac7e5 100644
+--- a/qcom/opensource/mm-drivers/hfi_core/Kbuild
++++ b/qcom/opensource/mm-drivers/hfi_core/Kbuild
+@@ -1,3 +1,16 @@
++# sm8750-mmdrivers-fix: only the DDK Makefile passes MSM_HFI_CORE_ROOT via KBUILD_OPTIONS, so under
++# the kbuild path (M=<abs dir>) it is empty and the includes below collapse
++# to '/config/...'. Derive it from $(src) instead.
++MSM_HFI_CORE_ROOT := $(src)/..
++
++# sm8750-mmdrivers-fix: GKI common/include also ships linux/remoteproc/qcom_rproc.h, but without
++# rproc_set_state; the vendor include tree has to win the search order.
++LINUXINCLUDE := -I$(srctree)/../vendor/lenovo/sm8750/include $(LINUXINCLUDE)
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include/linux
++
++# sm8750-mmdrivers-fix: src/*.c includes headers from this module's inc/ tree
++subdir-ccflags-y += -I$(src)/inc
+ # SPDX-License-Identifier: GPL-2.0-only
+ 
+ #KDIR := $(TOP)/kernel_platform/soc-repo
+diff --git a/qcom/opensource/mm-drivers/hw_fence/Kbuild b/qcom/opensource/mm-drivers/hw_fence/Kbuild
+index 238909c..c82c654 100644
+--- a/qcom/opensource/mm-drivers/hw_fence/Kbuild
++++ b/qcom/opensource/mm-drivers/hw_fence/Kbuild
+@@ -1,3 +1,16 @@
++# sm8750-mmdrivers-fix: only the DDK Makefile passes MSM_HW_FENCE_ROOT via KBUILD_OPTIONS, so under
++# the kbuild path (M=<abs dir>) it is empty and the includes below collapse
++# to '/config/...'. Derive it from $(src) instead.
++MSM_HW_FENCE_ROOT := $(src)/..
++
++# sm8750-mmdrivers-fix: GKI common/include also ships linux/remoteproc/qcom_rproc.h, but without
++# rproc_set_state; the vendor include tree has to win the search order.
++LINUXINCLUDE := -I$(srctree)/../vendor/lenovo/sm8750/include $(LINUXINCLUDE)
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include/linux
++
++# sm8750-mmdrivers-fix: src/*.c includes headers from this module's include/ tree
++subdir-ccflags-y += -I$(src)/include
+ # SPDX-License-Identifier: GPL-2.0-only
+ 
+ #KDIR := $(TOP)/kernel_platform/soc-repo
+diff --git a/qcom/opensource/mm-drivers/msm_ext_display/Kbuild b/qcom/opensource/mm-drivers/msm_ext_display/Kbuild
+index b845788..11fee4e 100644
+--- a/qcom/opensource/mm-drivers/msm_ext_display/Kbuild
++++ b/qcom/opensource/mm-drivers/msm_ext_display/Kbuild
+@@ -1,3 +1,16 @@
++# sm8750-mmdrivers-fix: only the DDK Makefile passes MSM_EXT_DISPLAY_ROOT via KBUILD_OPTIONS, so under
++# the kbuild path (M=<abs dir>) it is empty and the includes below collapse
++# to '/config/...'. Derive it from $(src) instead.
++MSM_EXT_DISPLAY_ROOT := $(src)/..
++
++# sm8750-mmdrivers-fix: GKI common/include also ships linux/remoteproc/qcom_rproc.h, but without
++# rproc_set_state; the vendor include tree has to win the search order.
++LINUXINCLUDE := -I$(srctree)/../vendor/lenovo/sm8750/include $(LINUXINCLUDE)
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include/linux
++
++# sm8750-mmdrivers-fix: src/*.c includes headers from this module's include/ tree
++subdir-ccflags-y += -I$(src)/include
+ # SPDX-License-Identifier: GPL-2.0-only
+ 
+ include $(MSM_EXT_DISPLAY_ROOT)/config/kalamammdrivers.conf
+diff --git a/qcom/opensource/mm-drivers/sync_fence/Kbuild b/qcom/opensource/mm-drivers/sync_fence/Kbuild
+index b7aa404..f34586d 100644
+--- a/qcom/opensource/mm-drivers/sync_fence/Kbuild
++++ b/qcom/opensource/mm-drivers/sync_fence/Kbuild
+@@ -1,3 +1,16 @@
++# sm8750-mmdrivers-fix: only the DDK Makefile passes SYNC_FENCE_ROOT via KBUILD_OPTIONS, so under
++# the kbuild path (M=<abs dir>) it is empty and the includes below collapse
++# to '/config/...'. Derive it from $(src) instead.
++SYNC_FENCE_ROOT := $(src)/..
++
++# sm8750-mmdrivers-fix: GKI common/include also ships linux/remoteproc/qcom_rproc.h, but without
++# rproc_set_state; the vendor include tree has to win the search order.
++LINUXINCLUDE := -I$(srctree)/../vendor/lenovo/sm8750/include $(LINUXINCLUDE)
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include/linux
++
++# sm8750-mmdrivers-fix: src/*.c includes headers from this module's include/ tree
++subdir-ccflags-y += -I$(src)/include
+ # SPDX-License-Identifier: GPL-2.0-only
+ 
+ #KDIR := $(TOP)/kernel_platform/soc-repo
+diff --git a/qcom/opensource/mmrm-driver/Kbuild b/qcom/opensource/mmrm-driver/Kbuild
+index 4cc599d..dc55005 100644
+--- a/qcom/opensource/mmrm-driver/Kbuild
++++ b/qcom/opensource/mmrm-driver/Kbuild
+@@ -1,3 +1,13 @@
++# sm8750-vendorinc: vendor headers (<dt-bindings/...>, <linux/soc/qcom/...>,
++# <soc/qcom/...>) all live under sm8750/include
++# sm8750-vendorinc: and must precede common/include, which has older copies
++LINUXINCLUDE := -I$(srctree)/../vendor/lenovo/sm8750/include $(LINUXINCLUDE)
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include/linux
++# sm8750-rootpath-fix: these only come from the DDK Makefile's KBUILD_OPTIONS,
++# which the kbuild path (M=<abs dir>) never passes; without them the
++# includes below collapse to '/config/...'.
++MMRM_ROOT := $(src)
+ 
+ include $(MMRM_ROOT)/config/waipiommrm.conf
+ LINUXINCLUDE += -include $(MMRM_ROOT)/config/waipiommrmconf.h
+diff --git a/qcom/opensource/mmrm-driver/driver/Kbuild b/qcom/opensource/mmrm-driver/driver/Kbuild
+index 3ca216a..1076d1d 100644
+--- a/qcom/opensource/mmrm-driver/driver/Kbuild
++++ b/qcom/opensource/mmrm-driver/driver/Kbuild
+@@ -1,3 +1,13 @@
++# sm8750-vendorinc: vendor headers (<dt-bindings/...>, <linux/soc/qcom/...>,
++# <soc/qcom/...>) all live under sm8750/include
++# sm8750-vendorinc: and must precede common/include, which has older copies
++LINUXINCLUDE := -I$(srctree)/../vendor/lenovo/sm8750/include $(LINUXINCLUDE)
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include/linux
++# sm8750-rootpath-fix: these only come from the DDK Makefile's KBUILD_OPTIONS,
++# which the kbuild path (M=<abs dir>) never passes; without them the
++# includes below collapse to '/config/...'.
++MMRM_ROOT := $(src)/..
+ ifdef CONFIG_MSM_MMRM
+ LINUXINCLUDE += -I$(MMRM_ROOT)/driver/src
+ 
+diff --git a/qcom/opensource/mmrm-driver/vm/be/Kbuild b/qcom/opensource/mmrm-driver/vm/be/Kbuild
+index feb17d5..7c9ced5 100644
+--- a/qcom/opensource/mmrm-driver/vm/be/Kbuild
++++ b/qcom/opensource/mmrm-driver/vm/be/Kbuild
+@@ -1,3 +1,13 @@
++# sm8750-vendorinc: vendor headers (<dt-bindings/...>, <linux/soc/qcom/...>,
++# <soc/qcom/...>) all live under sm8750/include
++# sm8750-vendorinc: and must precede common/include, which has older copies
++LINUXINCLUDE := -I$(srctree)/../vendor/lenovo/sm8750/include $(LINUXINCLUDE)
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include/linux
++# sm8750-rootpath-fix: these only come from the DDK Makefile's KBUILD_OPTIONS,
++# which the kbuild path (M=<abs dir>) never passes; without them the
++# includes below collapse to '/config/...'.
++MMRM_ROOT := $(src)/../..
+ ifeq ($(CONFIG_MSM_MMRM_VM),y)
+ LINUXINCLUDE += -I$(MMRM_ROOT)/vm/be/src -I$(MMRM_ROOT)/driver/src
+ 
+diff --git a/qcom/opensource/mmrm-driver/vm/fe/Kbuild b/qcom/opensource/mmrm-driver/vm/fe/Kbuild
+index d3cf667..8d31554 100644
+--- a/qcom/opensource/mmrm-driver/vm/fe/Kbuild
++++ b/qcom/opensource/mmrm-driver/vm/fe/Kbuild
+@@ -1,3 +1,9 @@
++# sm8750-vendorinc: vendor headers (<dt-bindings/...>, <linux/soc/qcom/...>,
++# <soc/qcom/...>) all live under sm8750/include
++# sm8750-vendorinc: and must precede common/include, which has older copies
++LINUXINCLUDE := -I$(srctree)/../vendor/lenovo/sm8750/include $(LINUXINCLUDE)
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include/linux
+ 
+ ifeq ($(CONFIG_MSM_MMRM_VM), y)
+ obj-m += mmrm_vm_fe.o
+diff --git a/qcom/opensource/mmrm-driver/vm/fe/vm_test/Kbuild b/qcom/opensource/mmrm-driver/vm/fe/vm_test/Kbuild
+index 313b56a..807e6b8 100644
+--- a/qcom/opensource/mmrm-driver/vm/fe/vm_test/Kbuild
++++ b/qcom/opensource/mmrm-driver/vm/fe/vm_test/Kbuild
+@@ -1,3 +1,9 @@
++# sm8750-vendorinc: vendor headers (<dt-bindings/...>, <linux/soc/qcom/...>,
++# <soc/qcom/...>) all live under sm8750/include
++# sm8750-vendorinc: and must precede common/include, which has older copies
++LINUXINCLUDE := -I$(srctree)/../vendor/lenovo/sm8750/include $(LINUXINCLUDE)
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include/linux
+ 
+ obj-m += mmrm_vm_fe_test.o
+ 
+diff --git a/qcom/opensource/securemsm-kernel/Kbuild b/qcom/opensource/securemsm-kernel/Kbuild
+index 77779ff..36c2631 100644
+--- a/qcom/opensource/securemsm-kernel/Kbuild
++++ b/qcom/opensource/securemsm-kernel/Kbuild
+@@ -1,3 +1,28 @@
++# sm8750-ssg-root-fix: SSG_MODULE_ROOT is only defined in the DDK Makefile, which
++# the kbuild path never reads; without it every include collapses to /config/...
++SSG_MODULE_ROOT := $(src)
++
++# sm8750-ssg-includes-v4: DDK Makefile 才会传这些 include 根，kbuild 路径下必须自己补，
++# 否则 <linux/IClientEnv.h>（模块 include/）与 <linux/hdcp_qseecom.h>、
++# <linux/msm_ion.h>（vendor include/ 与 uapi/）全部 not found。
++SSG_VENDOR := $(srctree)/../vendor/lenovo/sm8750
++# vendor include 必须前置：common/include 里的 <linux/firmware/qcom/qcom_scm.h>
++# 是瘦身后的 GKI 版，缺 qcom_scm_request_encrypted_log 等 vendor 扩展声明。
++LINUXINCLUDE := -I$(SSG_VENDOR)/include \
++                -I$(SSG_VENDOR)/include/linux \
++                -I$(SSG_VENDOR)/include/uapi \
++                $(LINUXINCLUDE)
++LINUXINCLUDE += -I$(SSG_MODULE_ROOT)/include \
++                -I$(SSG_MODULE_ROOT)/include/linux \
++                -I$(SSG_MODULE_ROOT)/include/uapi
++
++# sm8750-ssg-includes-v4: CONFIG_DISABLE_TEST_MODULES 只由 DDK Makefile 传入、无 Kconfig 定义，
++# kbuild 路径下恒为空，于是 LA 测试模块（tornado_mod / seccam_test_driver ...）
++# 全被编出来。它们不在 modules.load 清单里、编了也不安装，且依赖只有在模块
++# 子目录里才看得见的头文件。按 DDK 构建的语义显式关掉。
++CONFIG_DISABLE_TEST_MODULES := y
++
++
+ ifeq ($(TARGET_MACHINE), seraph)
+ LINUXINCLUDE := $(SOCINCLUDE) \
+                 $(LINUXINCLUDE)
+diff --git a/qcom/opensource/spu-kernel/Kbuild b/qcom/opensource/spu-kernel/Kbuild
+index 0018deb..f654104 100644
+--- a/qcom/opensource/spu-kernel/Kbuild
++++ b/qcom/opensource/spu-kernel/Kbuild
+@@ -1,3 +1,17 @@
++# sm8750-rootpath-fix: these only come from the DDK Makefile's KBUILD_OPTIONS,
++# which the kbuild path (M=<abs dir>) never passes; without them the
++# includes below collapse to '/config/...'.
++SPU_ROOT := $(src)
++
++# sm8750-spu-inc-fix: 上游写的是 bazel 布局下的相对路径
++# -I$(srctree)/../../vendor/qcom/opensource/spu-kernel/include/uapi，
++# kbuild 下（srctree=common）解析到不存在的目录，于是
++# <linux/spcom.h>（模块 include/uapi/linux/）与
++# <linux/remoteproc/qcom_spss.h>（vendor include/linux/remoteproc/）都找不到。
++LINUXINCLUDE += -I$(SPU_ROOT)/include/uapi \
++                -I$(srctree)/../vendor/lenovo/sm8750/include \
++                -I$(srctree)/../vendor/lenovo/sm8750/include/linux
++
+ # SPDX-License-Identifier: GPL-2.0-only
+ 
+ 
+@@ -6,9 +20,6 @@ ifeq ($(CONFIG_QCOM_SPSS), m)
+         LINUXINCLUDE += -include $(SPU_ROOT)/config/gki_spuconf.h
+ endif
+ 
+-LINUXINCLUDE += -I$(srctree)/../../vendor/qcom/opensource/spu-kernel/include/uapi
+-
+-
+ obj-$(CONFIG_MSM_SPCOM) += drivers/spcom.o
+ obj-$(CONFIG_MSM_SPSS_UTILS) += drivers/spss_utils.o
+ 
+diff --git a/qcom/opensource/synx-kernel/msm/Kbuild b/qcom/opensource/synx-kernel/msm/Kbuild
+index e2d505b..1795e7a 100644
+--- a/qcom/opensource/synx-kernel/msm/Kbuild
++++ b/qcom/opensource/synx-kernel/msm/Kbuild
+@@ -1,3 +1,7 @@
++# sm8750-rootpath-fix: these only come from the DDK Makefile's KBUILD_OPTIONS,
++# which the kbuild path (M=<abs dir>) never passes; without them the
++# includes below collapse to '/config/...'.
++SYNX_ROOT := $(src)/..
+ LINUXINCLUDE    += -I$(SYNX_ROOT)/include \
+                    -I$(SYNX_ROOT)/include/uapi \
+ 		   -I$(SYNX_ROOT)/include/uapi/synx/media \
+diff --git a/qcom/opensource/synx-kernel/msm/synx/synx.c b/qcom/opensource/synx-kernel/msm/synx/synx.c
+index 640c502..a4a48d7 100644
+--- a/qcom/opensource/synx-kernel/msm/synx/synx.c
++++ b/qcom/opensource/synx-kernel/msm/synx/synx.c
+@@ -17,6 +17,10 @@
+ #include <linux/version.h>
+ #include <linux/suspend.h>
+ #include <linux/notifier.h>
++// sm8750-synx-of: synx_dt_get_array() 用 of_find_node_by_path / of_property_* /
++// of_node_put，但上游依赖别处间接带入 <linux/of.h>；GKI 树里没有那层
++// 关系，于是全部报 undeclared function。同目录 ipclite.c 是直接 include 的。
++#include <linux/of.h>
+ 
+ #include "synx_debugfs.h"
+ #include "synx_private.h"
+diff --git a/qcom/opensource/touch-drivers/Kbuild b/qcom/opensource/touch-drivers/Kbuild
+index 0fdac14..67ecbb6 100644
+--- a/qcom/opensource/touch-drivers/Kbuild
++++ b/qcom/opensource/touch-drivers/Kbuild
+@@ -1,3 +1,11 @@
++# sm8750-vendorinc: vendor headers (<dt-bindings/...>, <linux/soc/qcom/...>,
++# <soc/qcom/...>) all live under sm8750/include
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include/linux
++# sm8750-rootpath-fix: these only come from the DDK Makefile's KBUILD_OPTIONS,
++# which the kbuild path (M=<abs dir>) never passes; without them the
++# includes below collapse to '/config/...'.
++TOUCH_ROOT := $(src)
+ 
+ KDIR := $(TOP)/kernel_platform/common
+ 
+diff --git a/qcom/opensource/video-driver/Kbuild b/qcom/opensource/video-driver/Kbuild
+index 6cd99d4..202b009 100644
+--- a/qcom/opensource/video-driver/Kbuild
++++ b/qcom/opensource/video-driver/Kbuild
+@@ -1,3 +1,11 @@
++# sm8750-vendorinc-first: 这些头文件在 common/include 与 vendor/include 里同名且共用同一个
++# include guard，但 common 版是瘦身 GKI 版（如 llcc-qcom.h 缺 LLCC_VIDDEC），
++# 先命中的赢。subdir-ccflags-y 只能追加，改不了顺序，故在 LINUXINCLUDE 上前置。
++LINUXINCLUDE := -I$(srctree)/../vendor/lenovo/sm8750/include $(LINUXINCLUDE)
++# sm8750-vendorinc: vendor headers (<dt-bindings/...>, <linux/soc/qcom/...>,
++# <soc/qcom/...>) all live under sm8750/include
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include/linux
+ ifeq ($(CONFIG_MSM_VIDC_ANDROID), m)
+ obj-m := msm_video/
+ else
+diff --git a/qcom/opensource/video-driver/msm_video/Kbuild b/qcom/opensource/video-driver/msm_video/Kbuild
+index 813d827..8884c51 100644
+--- a/qcom/opensource/video-driver/msm_video/Kbuild
++++ b/qcom/opensource/video-driver/msm_video/Kbuild
+@@ -1,3 +1,15 @@
++# sm8750-vendorinc-first: 这些头文件在 common/include 与 vendor/include 里同名且共用同一个
++# include guard，但 common 版是瘦身 GKI 版（如 llcc-qcom.h 缺 LLCC_VIDDEC），
++# 先命中的赢。subdir-ccflags-y 只能追加，改不了顺序，故在 LINUXINCLUDE 上前置。
++LINUXINCLUDE := -I$(srctree)/../vendor/lenovo/sm8750/include $(LINUXINCLUDE)
++# sm8750-vendorinc: vendor headers (<dt-bindings/...>, <linux/soc/qcom/...>,
++# <soc/qcom/...>) all live under sm8750/include
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include/linux
++# sm8750-rootpath-fix: these only come from the DDK Makefile's KBUILD_OPTIONS,
++# which the kbuild path (M=<abs dir>) never passes; without them the
++# includes below collapse to '/config/...'.
++VIDEO_ROOT := $(src)/..
+ # SPDX-License-Identifier: GPL-2.0-only
+ ifneq ($(CONFIG_ARCH_LEMANS), y)
+ KBUILD_CPPFLAGS += -DCONFIG_MSM_MMRM=1
+diff --git a/qcom/opensource/video-driver/video/Kbuild b/qcom/opensource/video-driver/video/Kbuild
+index 577db8f..b95c07e 100644
+--- a/qcom/opensource/video-driver/video/Kbuild
++++ b/qcom/opensource/video-driver/video/Kbuild
+@@ -1,3 +1,15 @@
++# sm8750-vendorinc-first: 这些头文件在 common/include 与 vendor/include 里同名且共用同一个
++# include guard，但 common 版是瘦身 GKI 版（如 llcc-qcom.h 缺 LLCC_VIDDEC），
++# 先命中的赢。subdir-ccflags-y 只能追加，改不了顺序，故在 LINUXINCLUDE 上前置。
++LINUXINCLUDE := -I$(srctree)/../vendor/lenovo/sm8750/include $(LINUXINCLUDE)
++# sm8750-vendorinc: vendor headers (<dt-bindings/...>, <linux/soc/qcom/...>,
++# <soc/qcom/...>) all live under sm8750/include
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include/linux
++# sm8750-rootpath-fix: these only come from the DDK Makefile's KBUILD_OPTIONS,
++# which the kbuild path (M=<abs dir>) never passes; without them the
++# includes below collapse to '/config/...'.
++VIDEO_ROOT := $(src)/..
+ # SPDX-License-Identifier: GPL-2.0-only
+ 
+ VIDEO_DRIVER_ABS_PATH := $(VIDEO_ROOT)/video/driver
+diff --git a/qcom/opensource/wlan/platform/Kbuild b/qcom/opensource/wlan/platform/Kbuild
+index c1ba6b8..3bdcbda 100644
+--- a/qcom/opensource/wlan/platform/Kbuild
++++ b/qcom/opensource/wlan/platform/Kbuild
+@@ -1,3 +1,11 @@
++# sm8750-vendorinc-first: 这些头文件在 common/include 与 vendor/include 里同名且共用同一个
++# include guard，但 common 版是瘦身 GKI 版（如 llcc-qcom.h 缺 LLCC_VIDDEC），
++# 先命中的赢。subdir-ccflags-y 只能追加，改不了顺序，故在 LINUXINCLUDE 上前置。
++LINUXINCLUDE := -I$(srctree)/../vendor/lenovo/sm8750/include $(LINUXINCLUDE)
++# sm8750-vendorinc: vendor headers (<dt-bindings/...>, <linux/soc/qcom/...>,
++# <soc/qcom/...>) all live under sm8750/include
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include/linux
+ include \
+ 	$(WLAN_PLATFORM_ROOT)/cnss2/sun_gki_defconfig \
+ 	$(WLAN_PLATFORM_ROOT)/cnss_genl/sun_gki_defconfig \
+diff --git a/qcom/opensource/wlan/platform/cnss2/Makefile b/qcom/opensource/wlan/platform/cnss2/Makefile
+index 6860ff5..1bf8709 100644
+--- a/qcom/opensource/wlan/platform/cnss2/Makefile
++++ b/qcom/opensource/wlan/platform/cnss2/Makefile
+@@ -1,3 +1,11 @@
++# sm8750-vendorinc-first: 这些头文件在 common/include 与 vendor/include 里同名且共用同一个
++# include guard，但 common 版是瘦身 GKI 版（如 llcc-qcom.h 缺 LLCC_VIDDEC），
++# 先命中的赢。subdir-ccflags-y 只能追加，改不了顺序，故在 LINUXINCLUDE 上前置。
++LINUXINCLUDE := -I$(srctree)/../vendor/lenovo/sm8750/include $(LINUXINCLUDE)
++# sm8750-vendorinc: vendor headers (<dt-bindings/...>, <linux/soc/qcom/...>,
++# <soc/qcom/...>) all live under sm8750/include
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include/linux
+ # SPDX-License-Identifier: GPL-2.0-only
+ 
+ include $(WLAN_PLATFORM_ROOT)/cnss2/sun_gki_defconfig
+diff --git a/qcom/opensource/wlan/platform/cnss_genl/Makefile b/qcom/opensource/wlan/platform/cnss_genl/Makefile
+index 074e616..4fccaa7 100644
+--- a/qcom/opensource/wlan/platform/cnss_genl/Makefile
++++ b/qcom/opensource/wlan/platform/cnss_genl/Makefile
+@@ -1,3 +1,11 @@
++# sm8750-vendorinc-first: 这些头文件在 common/include 与 vendor/include 里同名且共用同一个
++# include guard，但 common 版是瘦身 GKI 版（如 llcc-qcom.h 缺 LLCC_VIDDEC），
++# 先命中的赢。subdir-ccflags-y 只能追加，改不了顺序，故在 LINUXINCLUDE 上前置。
++LINUXINCLUDE := -I$(srctree)/../vendor/lenovo/sm8750/include $(LINUXINCLUDE)
++# sm8750-vendorinc: vendor headers (<dt-bindings/...>, <linux/soc/qcom/...>,
++# <soc/qcom/...>) all live under sm8750/include
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include/linux
+ # SPDX-License-Identifier: GPL-2.0-only
+ 
+ include $(WLAN_PLATFORM_ROOT)/cnss_genl/sun_gki_defconfig
+diff --git a/qcom/opensource/wlan/platform/cnss_prealloc/Makefile b/qcom/opensource/wlan/platform/cnss_prealloc/Makefile
+index 12d2bdd..aad64fb 100644
+--- a/qcom/opensource/wlan/platform/cnss_prealloc/Makefile
++++ b/qcom/opensource/wlan/platform/cnss_prealloc/Makefile
+@@ -1,3 +1,16 @@
++# sm8750-vendorinc-first: 这些头文件在 common/include 与 vendor/include 里同名且共用同一个
++# include guard，但 common 版是瘦身 GKI 版（如 llcc-qcom.h 缺 LLCC_VIDDEC），
++# 先命中的赢。subdir-ccflags-y 只能追加，改不了顺序，故在 LINUXINCLUDE 上前置。
++LINUXINCLUDE := -I$(srctree)/../vendor/lenovo/sm8750/include $(LINUXINCLUDE)
++# sm8750-vendorinc: vendor headers (<dt-bindings/...>, <linux/soc/qcom/...>,
++# <soc/qcom/...>) all live under sm8750/include
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include/linux
++# sm8750-missingmod-fix: vendor include roots for this module
++subdir-ccflags-y += -idirafter $(srctree)/../vendor/lenovo/sm8750/include
++subdir-ccflags-y += -idirafter $(srctree)/../vendor/lenovo/sm8750/include/linux
++ccflags-y += -idirafter $(srctree)/../vendor/lenovo/sm8750/include
++ccflags-y += -idirafter $(srctree)/../vendor/lenovo/sm8750/include/linux
+ # SPDX-License-Identifier: GPL-2.0-only
+ 
+ include $(WLAN_PLATFORM_ROOT)/cnss_prealloc/sun_gki_defconfig
+diff --git a/qcom/opensource/wlan/platform/cnss_utils/Makefile b/qcom/opensource/wlan/platform/cnss_utils/Makefile
+index 578ab08..8796519 100644
+--- a/qcom/opensource/wlan/platform/cnss_utils/Makefile
++++ b/qcom/opensource/wlan/platform/cnss_utils/Makefile
+@@ -1,3 +1,16 @@
++# sm8750-vendorinc-first: 这些头文件在 common/include 与 vendor/include 里同名且共用同一个
++# include guard，但 common 版是瘦身 GKI 版（如 llcc-qcom.h 缺 LLCC_VIDDEC），
++# 先命中的赢。subdir-ccflags-y 只能追加，改不了顺序，故在 LINUXINCLUDE 上前置。
++LINUXINCLUDE := -I$(srctree)/../vendor/lenovo/sm8750/include $(LINUXINCLUDE)
++# sm8750-vendorinc: vendor headers (<dt-bindings/...>, <linux/soc/qcom/...>,
++# <soc/qcom/...>) all live under sm8750/include
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include/linux
++# sm8750-missingmod-fix: vendor include roots for this module
++subdir-ccflags-y += -idirafter $(srctree)/../vendor/lenovo/sm8750/include
++subdir-ccflags-y += -idirafter $(srctree)/../vendor/lenovo/sm8750/include/linux
++ccflags-y += -idirafter $(srctree)/../vendor/lenovo/sm8750/include
++ccflags-y += -idirafter $(srctree)/../vendor/lenovo/sm8750/include/linux
+ # SPDX-License-Identifier: GPL-2.0-only
+ 
+ include $(WLAN_PLATFORM_ROOT)/cnss_utils/sun_gki_defconfig
+diff --git a/qcom/opensource/wlan/platform/icnss2/Makefile b/qcom/opensource/wlan/platform/icnss2/Makefile
+index 21f4770..65a811e 100644
+--- a/qcom/opensource/wlan/platform/icnss2/Makefile
++++ b/qcom/opensource/wlan/platform/icnss2/Makefile
+@@ -1,3 +1,11 @@
++# sm8750-vendorinc-first: 这些头文件在 common/include 与 vendor/include 里同名且共用同一个
++# include guard，但 common 版是瘦身 GKI 版（如 llcc-qcom.h 缺 LLCC_VIDDEC），
++# 先命中的赢。subdir-ccflags-y 只能追加，改不了顺序，故在 LINUXINCLUDE 上前置。
++LINUXINCLUDE := -I$(srctree)/../vendor/lenovo/sm8750/include $(LINUXINCLUDE)
++# sm8750-vendorinc: vendor headers (<dt-bindings/...>, <linux/soc/qcom/...>,
++# <soc/qcom/...>) all live under sm8750/include
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include
++subdir-ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include/linux
+ # SPDX-License-Identifier: GPL-2.0-only
+ 
+ include $(WLAN_PLATFORM_ROOT)/icnss2/sun_gki_defconfig
+diff --git a/st/opensource/driver/Kbuild b/st/opensource/driver/Kbuild
+index d14455d..099b51e 100644
+--- a/st/opensource/driver/Kbuild
++++ b/st/opensource/driver/Kbuild
+@@ -7,6 +7,7 @@ LINUXINCLUDE   += -I$(NFC_ROOT)/../../../qcom/opensource/securemsm-kernel/includ
+ obj-m += stm_nfc_i2c.o
+ 
+ ccflags-y := $(call cc-option,-Wno-misleading-indentation)
++ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include
+ # define_modules.bzl sets this for sun; nfc_hw_secure_check() needs smcinvoke.
+ ccflags-y += -DNFC_SECURE_PERIPHERAL_ENABLED
+ stm_nfc_i2c-y :=  nfc/st21nfc.o
+diff --git a/st/opensource/eSE-driver/Kbuild b/st/opensource/eSE-driver/Kbuild
+index d819a0d..4da66bd 100644
+--- a/st/opensource/eSE-driver/Kbuild
++++ b/st/opensource/eSE-driver/Kbuild
+@@ -1,4 +1,5 @@
+ obj-m += stm_st54se_gpio.o
+ 
+ ccflags-y := $(call cc-option,-Wno-misleading-indentation)
++ccflags-y += -I$(srctree)/../vendor/lenovo/sm8750/include
+ stm_st54se_gpio-y :=  st54spi_gpio.o

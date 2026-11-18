@@ -1,0 +1,356 @@
+diff --git a/qcom/opensource/wlan/variants/kiwi_v2/Kbuild b/qcom/opensource/wlan/variants/kiwi_v2/Kbuild
+new file mode 100644
+index 0000000..491e5f8
+--- /dev/null
++++ b/qcom/opensource/wlan/variants/kiwi_v2/Kbuild
+@@ -0,0 +1,51 @@
++# sm8750-wlan-variant: 变体 kiwi_v2 的 kbuild 包装（bazel 侧是独立 ddk_module）
++#
++# 路径必须 abspath：kbuild/make 会尝试重建 include 的目标，含 `..` 段的
++# 路径在拼接 objtree 前缀后变成 '../../../../../..//home/...'，make 认不出，
++# 于是报 No rule to make target '.../qcacld-3.0/configs/sun_gki_kiwi_v2_defconfig'。
++#
++# WLAN_PLATFORM_ROOT 也必须给：qcacld-3.0/Kbuild 开头就 include
++# $(WLAN_PLATFORM_ROOT)/{cnss2,cnss_genl,cnss_prealloc,cnss_utils,icnss2}/
++# sun_gki_defconfig，而上游只在 wlan/platform/Makefile 与 Android.mk 里定义它。
++# 本变体由 device bp 的 external_modules 直接调用，不经过 wlan/Kbuild。
++#
++# 两个 BUILD_TOP 变量必须清空：qcacld-3.0/Kbuild:34-45 在 KERNEL_BUILD=n
++# 且 BUILD_TOP 非空时会做
++#   override WLAN_ROOT := $(BUILD_TOP_REL)/$(WLAN_ROOT)
++# 它假定 WLAN_ROOT 是相对 BUILD_TOP 的路径；本包装给的是绝对路径，
++# 于是被拼成 '../../../../../../../../..//home/...' —— 从 kernel_build 目录
++# 回溯到 aosp 的 9 级 '..' 再跟一个绝对路径，make 找不到该目标，报
++#   No rule to make target '.../configs/sun_gki_<variant>_defconfig'
++# envsetup.sh 会 export ANDROID_BUILD_TOP，所以这个分支在 soong 里必然命中。
++# 这两个变量在 wlan 树中只被那段 override 使用，清空是安全的；
++# unexport 保证 kbuild 递归的 sub-make 里也不会再出现。
++ANDROID_BUILD_TOP :=
++LINUX_BUILD_TOP :=
++unexport ANDROID_BUILD_TOP
++unexport LINUX_BUILD_TOP
++MODNAME := qca_cld3_kiwi_v2
++DEVNAME := kiwi_v2
++WLAN_VARIANT := kiwi_v2
++override CONFIG_QCA_CLD_WLAN := m
++# IPA 头路径：defconfig 里 CONFIG_IPA_OFFLOAD=y 会让 cmn/qdf/linux/src/
++# i_qdf_types.h:66 去 #include <linux/ipa.h>，而该头只在
++# qcacld-3.0/Kbuild:3843-3844 的 ccflags-$(CONFIG_IPA_OUT_OF_TREE) 里才被
++# 加入 include 路径（DATA_IPA_INC -> opensource/dataipa/drivers/platform/msm/include）。
++# defconfig 只设了 CONFIG_CNSS_OUT_OF_TREE=y，没设 IPA 这一项，于是头找不到。
++# 全 wlan 树中该变量仅被那两行引用，补上无其它副作用。
++override CONFIG_IPA_OUT_OF_TREE := y
++CONFIG_QCA_CLD_WLAN_PROFILE := sun_gki_kiwi-v2
++WLAN_ROOT := $(abspath $(src)/../../qcacld-3.0)
++export WLAN_PLATFORM_ROOT := $(abspath $(src)/../../platform)
++ccflags-y += -idirafter $(abspath $(srctree)/../vendor/lenovo/sm8750/include)
++ccflags-y += -idirafter $(abspath $(srctree)/../vendor/lenovo/sm8750/include/linux)
++# 把 vendored 代码的既有告警降回告警，不让 -Werror 中断构建。
++#
++# 本树 CONFIG_WERROR=y，而 qcacld/core 是从 git 同步来的第三方代码，
++# 其中的告警（如 wlan_hdd_cfg80211.c:14847 的 -Wenum-compare、
++# wlan_hdd_hostapd.c:1112 的 -Wmissing-prototypes）在 clang 22 下会被
++# 升成错误。逐个改 vendored 源码不可维护 —— 1120 个 .c 会一个接一个
++# 冒出新告警。这里只关闭「告警转错误」，告警本身仍会打印，便于发现问题。
++ccflags-y += -Wno-error
++
++include $(WLAN_ROOT)/Kbuild
+diff --git a/qcom/opensource/wlan/variants/kiwi_v2/cmn b/qcom/opensource/wlan/variants/kiwi_v2/cmn
+new file mode 120000
+index 0000000..5ea1393
+--- /dev/null
++++ b/qcom/opensource/wlan/variants/kiwi_v2/cmn
+@@ -0,0 +1 @@
++../../qcacld-3.0/cmn
+\ No newline at end of file
+diff --git a/qcom/opensource/wlan/variants/kiwi_v2/components b/qcom/opensource/wlan/variants/kiwi_v2/components
+new file mode 120000
+index 0000000..ee4e9da
+--- /dev/null
++++ b/qcom/opensource/wlan/variants/kiwi_v2/components
+@@ -0,0 +1 @@
++../../qcacld-3.0/components
+\ No newline at end of file
+diff --git a/qcom/opensource/wlan/variants/kiwi_v2/core b/qcom/opensource/wlan/variants/kiwi_v2/core
+new file mode 120000
+index 0000000..ef1c7d4
+--- /dev/null
++++ b/qcom/opensource/wlan/variants/kiwi_v2/core
+@@ -0,0 +1 @@
++../../qcacld-3.0/core
+\ No newline at end of file
+diff --git a/qcom/opensource/wlan/variants/kiwi_v2/os_if b/qcom/opensource/wlan/variants/kiwi_v2/os_if
+new file mode 120000
+index 0000000..18eed8b
+--- /dev/null
++++ b/qcom/opensource/wlan/variants/kiwi_v2/os_if
+@@ -0,0 +1 @@
++../../qcacld-3.0/os_if
+\ No newline at end of file
+diff --git a/qcom/opensource/wlan/variants/peach/Kbuild b/qcom/opensource/wlan/variants/peach/Kbuild
+new file mode 100644
+index 0000000..410f7ed
+--- /dev/null
++++ b/qcom/opensource/wlan/variants/peach/Kbuild
+@@ -0,0 +1,51 @@
++# sm8750-wlan-variant: 变体 peach 的 kbuild 包装（bazel 侧是独立 ddk_module）
++#
++# 路径必须 abspath：kbuild/make 会尝试重建 include 的目标，含 `..` 段的
++# 路径在拼接 objtree 前缀后变成 '../../../../../..//home/...'，make 认不出，
++# 于是报 No rule to make target '.../qcacld-3.0/configs/sun_gki_peach_defconfig'。
++#
++# WLAN_PLATFORM_ROOT 也必须给：qcacld-3.0/Kbuild 开头就 include
++# $(WLAN_PLATFORM_ROOT)/{cnss2,cnss_genl,cnss_prealloc,cnss_utils,icnss2}/
++# sun_gki_defconfig，而上游只在 wlan/platform/Makefile 与 Android.mk 里定义它。
++# 本变体由 device bp 的 external_modules 直接调用，不经过 wlan/Kbuild。
++#
++# 两个 BUILD_TOP 变量必须清空：qcacld-3.0/Kbuild:34-45 在 KERNEL_BUILD=n
++# 且 BUILD_TOP 非空时会做
++#   override WLAN_ROOT := $(BUILD_TOP_REL)/$(WLAN_ROOT)
++# 它假定 WLAN_ROOT 是相对 BUILD_TOP 的路径；本包装给的是绝对路径，
++# 于是被拼成 '../../../../../../../../..//home/...' —— 从 kernel_build 目录
++# 回溯到 aosp 的 9 级 '..' 再跟一个绝对路径，make 找不到该目标，报
++#   No rule to make target '.../configs/sun_gki_<variant>_defconfig'
++# envsetup.sh 会 export ANDROID_BUILD_TOP，所以这个分支在 soong 里必然命中。
++# 这两个变量在 wlan 树中只被那段 override 使用，清空是安全的；
++# unexport 保证 kbuild 递归的 sub-make 里也不会再出现。
++ANDROID_BUILD_TOP :=
++LINUX_BUILD_TOP :=
++unexport ANDROID_BUILD_TOP
++unexport LINUX_BUILD_TOP
++MODNAME := qca_cld3_peach
++DEVNAME := peach
++WLAN_VARIANT := peach
++override CONFIG_QCA_CLD_WLAN := m
++# IPA 头路径：defconfig 里 CONFIG_IPA_OFFLOAD=y 会让 cmn/qdf/linux/src/
++# i_qdf_types.h:66 去 #include <linux/ipa.h>，而该头只在
++# qcacld-3.0/Kbuild:3843-3844 的 ccflags-$(CONFIG_IPA_OUT_OF_TREE) 里才被
++# 加入 include 路径（DATA_IPA_INC -> opensource/dataipa/drivers/platform/msm/include）。
++# defconfig 只设了 CONFIG_CNSS_OUT_OF_TREE=y，没设 IPA 这一项，于是头找不到。
++# 全 wlan 树中该变量仅被那两行引用，补上无其它副作用。
++override CONFIG_IPA_OUT_OF_TREE := y
++CONFIG_QCA_CLD_WLAN_PROFILE := sun_gki_peach
++WLAN_ROOT := $(abspath $(src)/../../qcacld-3.0)
++export WLAN_PLATFORM_ROOT := $(abspath $(src)/../../platform)
++ccflags-y += -idirafter $(abspath $(srctree)/../vendor/lenovo/sm8750/include)
++ccflags-y += -idirafter $(abspath $(srctree)/../vendor/lenovo/sm8750/include/linux)
++# 把 vendored 代码的既有告警降回告警，不让 -Werror 中断构建。
++#
++# 本树 CONFIG_WERROR=y，而 qcacld/core 是从 git 同步来的第三方代码，
++# 其中的告警（如 wlan_hdd_cfg80211.c:14847 的 -Wenum-compare、
++# wlan_hdd_hostapd.c:1112 的 -Wmissing-prototypes）在 clang 22 下会被
++# 升成错误。逐个改 vendored 源码不可维护 —— 1120 个 .c 会一个接一个
++# 冒出新告警。这里只关闭「告警转错误」，告警本身仍会打印，便于发现问题。
++ccflags-y += -Wno-error
++
++include $(WLAN_ROOT)/Kbuild
+diff --git a/qcom/opensource/wlan/variants/peach/cmn b/qcom/opensource/wlan/variants/peach/cmn
+new file mode 120000
+index 0000000..5ea1393
+--- /dev/null
++++ b/qcom/opensource/wlan/variants/peach/cmn
+@@ -0,0 +1 @@
++../../qcacld-3.0/cmn
+\ No newline at end of file
+diff --git a/qcom/opensource/wlan/variants/peach/components b/qcom/opensource/wlan/variants/peach/components
+new file mode 120000
+index 0000000..ee4e9da
+--- /dev/null
++++ b/qcom/opensource/wlan/variants/peach/components
+@@ -0,0 +1 @@
++../../qcacld-3.0/components
+\ No newline at end of file
+diff --git a/qcom/opensource/wlan/variants/peach/core b/qcom/opensource/wlan/variants/peach/core
+new file mode 120000
+index 0000000..ef1c7d4
+--- /dev/null
++++ b/qcom/opensource/wlan/variants/peach/core
+@@ -0,0 +1 @@
++../../qcacld-3.0/core
+\ No newline at end of file
+diff --git a/qcom/opensource/wlan/variants/peach/os_if b/qcom/opensource/wlan/variants/peach/os_if
+new file mode 120000
+index 0000000..18eed8b
+--- /dev/null
++++ b/qcom/opensource/wlan/variants/peach/os_if
+@@ -0,0 +1 @@
++../../qcacld-3.0/os_if
+\ No newline at end of file
+diff --git a/qcom/opensource/wlan/variants/peach_v2/Kbuild b/qcom/opensource/wlan/variants/peach_v2/Kbuild
+new file mode 100644
+index 0000000..ea79731
+--- /dev/null
++++ b/qcom/opensource/wlan/variants/peach_v2/Kbuild
+@@ -0,0 +1,51 @@
++# sm8750-wlan-variant: 变体 peach_v2 的 kbuild 包装（bazel 侧是独立 ddk_module）
++#
++# 路径必须 abspath：kbuild/make 会尝试重建 include 的目标，含 `..` 段的
++# 路径在拼接 objtree 前缀后变成 '../../../../../..//home/...'，make 认不出，
++# 于是报 No rule to make target '.../qcacld-3.0/configs/sun_gki_peach_v2_defconfig'。
++#
++# WLAN_PLATFORM_ROOT 也必须给：qcacld-3.0/Kbuild 开头就 include
++# $(WLAN_PLATFORM_ROOT)/{cnss2,cnss_genl,cnss_prealloc,cnss_utils,icnss2}/
++# sun_gki_defconfig，而上游只在 wlan/platform/Makefile 与 Android.mk 里定义它。
++# 本变体由 device bp 的 external_modules 直接调用，不经过 wlan/Kbuild。
++#
++# 两个 BUILD_TOP 变量必须清空：qcacld-3.0/Kbuild:34-45 在 KERNEL_BUILD=n
++# 且 BUILD_TOP 非空时会做
++#   override WLAN_ROOT := $(BUILD_TOP_REL)/$(WLAN_ROOT)
++# 它假定 WLAN_ROOT 是相对 BUILD_TOP 的路径；本包装给的是绝对路径，
++# 于是被拼成 '../../../../../../../../..//home/...' —— 从 kernel_build 目录
++# 回溯到 aosp 的 9 级 '..' 再跟一个绝对路径，make 找不到该目标，报
++#   No rule to make target '.../configs/sun_gki_<variant>_defconfig'
++# envsetup.sh 会 export ANDROID_BUILD_TOP，所以这个分支在 soong 里必然命中。
++# 这两个变量在 wlan 树中只被那段 override 使用，清空是安全的；
++# unexport 保证 kbuild 递归的 sub-make 里也不会再出现。
++ANDROID_BUILD_TOP :=
++LINUX_BUILD_TOP :=
++unexport ANDROID_BUILD_TOP
++unexport LINUX_BUILD_TOP
++MODNAME := qca_cld3_peach_v2
++DEVNAME := peach_v2
++WLAN_VARIANT := peach_v2
++override CONFIG_QCA_CLD_WLAN := m
++# IPA 头路径：defconfig 里 CONFIG_IPA_OFFLOAD=y 会让 cmn/qdf/linux/src/
++# i_qdf_types.h:66 去 #include <linux/ipa.h>，而该头只在
++# qcacld-3.0/Kbuild:3843-3844 的 ccflags-$(CONFIG_IPA_OUT_OF_TREE) 里才被
++# 加入 include 路径（DATA_IPA_INC -> opensource/dataipa/drivers/platform/msm/include）。
++# defconfig 只设了 CONFIG_CNSS_OUT_OF_TREE=y，没设 IPA 这一项，于是头找不到。
++# 全 wlan 树中该变量仅被那两行引用，补上无其它副作用。
++override CONFIG_IPA_OUT_OF_TREE := y
++CONFIG_QCA_CLD_WLAN_PROFILE := sun_gki_peach-v2
++WLAN_ROOT := $(abspath $(src)/../../qcacld-3.0)
++export WLAN_PLATFORM_ROOT := $(abspath $(src)/../../platform)
++ccflags-y += -idirafter $(abspath $(srctree)/../vendor/lenovo/sm8750/include)
++ccflags-y += -idirafter $(abspath $(srctree)/../vendor/lenovo/sm8750/include/linux)
++# 把 vendored 代码的既有告警降回告警，不让 -Werror 中断构建。
++#
++# 本树 CONFIG_WERROR=y，而 qcacld/core 是从 git 同步来的第三方代码，
++# 其中的告警（如 wlan_hdd_cfg80211.c:14847 的 -Wenum-compare、
++# wlan_hdd_hostapd.c:1112 的 -Wmissing-prototypes）在 clang 22 下会被
++# 升成错误。逐个改 vendored 源码不可维护 —— 1120 个 .c 会一个接一个
++# 冒出新告警。这里只关闭「告警转错误」，告警本身仍会打印，便于发现问题。
++ccflags-y += -Wno-error
++
++include $(WLAN_ROOT)/Kbuild
+diff --git a/qcom/opensource/wlan/variants/peach_v2/cmn b/qcom/opensource/wlan/variants/peach_v2/cmn
+new file mode 120000
+index 0000000..5ea1393
+--- /dev/null
++++ b/qcom/opensource/wlan/variants/peach_v2/cmn
+@@ -0,0 +1 @@
++../../qcacld-3.0/cmn
+\ No newline at end of file
+diff --git a/qcom/opensource/wlan/variants/peach_v2/components b/qcom/opensource/wlan/variants/peach_v2/components
+new file mode 120000
+index 0000000..ee4e9da
+--- /dev/null
++++ b/qcom/opensource/wlan/variants/peach_v2/components
+@@ -0,0 +1 @@
++../../qcacld-3.0/components
+\ No newline at end of file
+diff --git a/qcom/opensource/wlan/variants/peach_v2/core b/qcom/opensource/wlan/variants/peach_v2/core
+new file mode 120000
+index 0000000..ef1c7d4
+--- /dev/null
++++ b/qcom/opensource/wlan/variants/peach_v2/core
+@@ -0,0 +1 @@
++../../qcacld-3.0/core
+\ No newline at end of file
+diff --git a/qcom/opensource/wlan/variants/peach_v2/os_if b/qcom/opensource/wlan/variants/peach_v2/os_if
+new file mode 120000
+index 0000000..18eed8b
+--- /dev/null
++++ b/qcom/opensource/wlan/variants/peach_v2/os_if
+@@ -0,0 +1 @@
++../../qcacld-3.0/os_if
+\ No newline at end of file
+diff --git a/qcom/opensource/wlan/variants/wcn7750/Kbuild b/qcom/opensource/wlan/variants/wcn7750/Kbuild
+new file mode 100644
+index 0000000..a88e744
+--- /dev/null
++++ b/qcom/opensource/wlan/variants/wcn7750/Kbuild
+@@ -0,0 +1,51 @@
++# sm8750-wlan-variant: 变体 wcn7750 的 kbuild 包装（bazel 侧是独立 ddk_module）
++#
++# 路径必须 abspath：kbuild/make 会尝试重建 include 的目标，含 `..` 段的
++# 路径在拼接 objtree 前缀后变成 '../../../../../..//home/...'，make 认不出，
++# 于是报 No rule to make target '.../qcacld-3.0/configs/sun_gki_wcn7750_defconfig'。
++#
++# WLAN_PLATFORM_ROOT 也必须给：qcacld-3.0/Kbuild 开头就 include
++# $(WLAN_PLATFORM_ROOT)/{cnss2,cnss_genl,cnss_prealloc,cnss_utils,icnss2}/
++# sun_gki_defconfig，而上游只在 wlan/platform/Makefile 与 Android.mk 里定义它。
++# 本变体由 device bp 的 external_modules 直接调用，不经过 wlan/Kbuild。
++#
++# 两个 BUILD_TOP 变量必须清空：qcacld-3.0/Kbuild:34-45 在 KERNEL_BUILD=n
++# 且 BUILD_TOP 非空时会做
++#   override WLAN_ROOT := $(BUILD_TOP_REL)/$(WLAN_ROOT)
++# 它假定 WLAN_ROOT 是相对 BUILD_TOP 的路径；本包装给的是绝对路径，
++# 于是被拼成 '../../../../../../../../..//home/...' —— 从 kernel_build 目录
++# 回溯到 aosp 的 9 级 '..' 再跟一个绝对路径，make 找不到该目标，报
++#   No rule to make target '.../configs/sun_gki_<variant>_defconfig'
++# envsetup.sh 会 export ANDROID_BUILD_TOP，所以这个分支在 soong 里必然命中。
++# 这两个变量在 wlan 树中只被那段 override 使用，清空是安全的；
++# unexport 保证 kbuild 递归的 sub-make 里也不会再出现。
++ANDROID_BUILD_TOP :=
++LINUX_BUILD_TOP :=
++unexport ANDROID_BUILD_TOP
++unexport LINUX_BUILD_TOP
++MODNAME := qca_cld3_wcn7750
++DEVNAME := wcn7750
++WLAN_VARIANT := wcn7750
++override CONFIG_QCA_CLD_WLAN := m
++# IPA 头路径：defconfig 里 CONFIG_IPA_OFFLOAD=y 会让 cmn/qdf/linux/src/
++# i_qdf_types.h:66 去 #include <linux/ipa.h>，而该头只在
++# qcacld-3.0/Kbuild:3843-3844 的 ccflags-$(CONFIG_IPA_OUT_OF_TREE) 里才被
++# 加入 include 路径（DATA_IPA_INC -> opensource/dataipa/drivers/platform/msm/include）。
++# defconfig 只设了 CONFIG_CNSS_OUT_OF_TREE=y，没设 IPA 这一项，于是头找不到。
++# 全 wlan 树中该变量仅被那两行引用，补上无其它副作用。
++override CONFIG_IPA_OUT_OF_TREE := y
++CONFIG_QCA_CLD_WLAN_PROFILE := sun_gki_wcn7750
++WLAN_ROOT := $(abspath $(src)/../../qcacld-3.0)
++export WLAN_PLATFORM_ROOT := $(abspath $(src)/../../platform)
++ccflags-y += -idirafter $(abspath $(srctree)/../vendor/lenovo/sm8750/include)
++ccflags-y += -idirafter $(abspath $(srctree)/../vendor/lenovo/sm8750/include/linux)
++# 把 vendored 代码的既有告警降回告警，不让 -Werror 中断构建。
++#
++# 本树 CONFIG_WERROR=y，而 qcacld/core 是从 git 同步来的第三方代码，
++# 其中的告警（如 wlan_hdd_cfg80211.c:14847 的 -Wenum-compare、
++# wlan_hdd_hostapd.c:1112 的 -Wmissing-prototypes）在 clang 22 下会被
++# 升成错误。逐个改 vendored 源码不可维护 —— 1120 个 .c 会一个接一个
++# 冒出新告警。这里只关闭「告警转错误」，告警本身仍会打印，便于发现问题。
++ccflags-y += -Wno-error
++
++include $(WLAN_ROOT)/Kbuild
+diff --git a/qcom/opensource/wlan/variants/wcn7750/cmn b/qcom/opensource/wlan/variants/wcn7750/cmn
+new file mode 120000
+index 0000000..5ea1393
+--- /dev/null
++++ b/qcom/opensource/wlan/variants/wcn7750/cmn
+@@ -0,0 +1 @@
++../../qcacld-3.0/cmn
+\ No newline at end of file
+diff --git a/qcom/opensource/wlan/variants/wcn7750/components b/qcom/opensource/wlan/variants/wcn7750/components
+new file mode 120000
+index 0000000..ee4e9da
+--- /dev/null
++++ b/qcom/opensource/wlan/variants/wcn7750/components
+@@ -0,0 +1 @@
++../../qcacld-3.0/components
+\ No newline at end of file
+diff --git a/qcom/opensource/wlan/variants/wcn7750/core b/qcom/opensource/wlan/variants/wcn7750/core
+new file mode 120000
+index 0000000..ef1c7d4
+--- /dev/null
++++ b/qcom/opensource/wlan/variants/wcn7750/core
+@@ -0,0 +1 @@
++../../qcacld-3.0/core
+\ No newline at end of file
+diff --git a/qcom/opensource/wlan/variants/wcn7750/os_if b/qcom/opensource/wlan/variants/wcn7750/os_if
+new file mode 120000
+index 0000000..18eed8b
+--- /dev/null
++++ b/qcom/opensource/wlan/variants/wcn7750/os_if
+@@ -0,0 +1 @@
++../../qcacld-3.0/os_if
+\ No newline at end of file

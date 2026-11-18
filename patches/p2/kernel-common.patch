@@ -1,0 +1,78 @@
+diff --git a/rust/Makefile b/rust/Makefile
+index 1d77357fedfd..6a8566023736 100644
+--- a/rust/Makefile
++++ b/rust/Makefile
+@@ -304,7 +304,15 @@ endif
+ # prototypes for functions like `memcpy` -- if this flag is not passed,
+ # `bindgen`-generated prototypes use `c_ulong` or `c_uint` depending on
+ # architecture instead of generating `usize`.
+-bindgen_c_flags_final = $(bindgen_c_flags_lto) -fno-builtin -D__BINDGEN__
++# sm8750-bindgen-skip-cflags: 在汇聚点剔除两项。Clang 分支（CONFIG_CC_IS_CLANG=y，本树即是）的
++#     bindgen_c_flags = $(c_flags)
++# 是直接透传、不经过 bindgen_skip_c_flags 的，所以跳过项只在 else(GCC)
++# 分支里加，对本树无效。这两项由 scripts/Makefile.extrawarn 的
++# cc-disable-warning 按 clang 22 探测展开，而 bindgen 的 libclang 是
++# LLVM 20（见 scripts/fix-bindgen-libclang.py），不认识它们；KBUILD_CFLAGS
++# 带 -Werror，告警于是变成错误、bindgen 放弃生成。两者只是告警开关，
++# 剔掉不影响生成的绑定内容。filter-out 按词精确匹配且幂等。
++bindgen_c_flags_final = $(filter-out -Wno-default-const-init-unsafe -Wno-unterminated-string-initialization,$(bindgen_c_flags_lto)) -fno-builtin -D__BINDGEN__
+ 
+ # Each `bindgen` release may upgrade the list of Rust target versions. By
+ # default, the highest stable release in their list is used. Thus we need to set
+diff --git a/scripts/gendwarfksyms/dwarf.c b/scripts/gendwarfksyms/dwarf.c
+index 13ea7bf1ae7d..6aca77607be6 100644
+--- a/scripts/gendwarfksyms/dwarf.c
++++ b/scripts/gendwarfksyms/dwarf.c
+@@ -130,8 +130,24 @@ static bool is_definition_private(Dwarf_Die *die)
+ 	if (!dwarf_cu_die(die->cu, &cudie, NULL, NULL, NULL, NULL, NULL, NULL))
+ 		error("dwarf_cu_die failed: '%s'", dwarf_errmsg(-1));
+ 
+-	if (dwarf_getsrcfiles(&cudie, &files, NULL))
+-		error("dwarf_getsrcfiles failed: '%s'", dwarf_errmsg(-1));
++	/*
++	 * sm8750-gendwarfksyms-libdw-fallback: clang 生成的 DWARF4 里有 libdw 不接受之处（实测 libdw 0.186
++	 * 与 0.188 都对 kernel/fork.c、rust/helpers/helpers.o 等报
++	 * "invalid .debug_line section"，而 llvm-dwarfdump 解析同一批文件
++	 * 完全正常）。重新生成的 DWARF 不该让构建停下，所以这里退化为用
++	 * CU 的 DW_AT_name（该编译单元的主源文件）判断扩展名 —— 与原逻辑
++	 * 「DW_AT_decl_file 指向的文件是否 .c」在单源文件 TU 上等价。
++	 * 详见 scripts/fix-gendwarfksyms-libdw.py。
++	 */
++	if (dwarf_getsrcfiles(&cudie, &files, NULL)) {
++		s = dwarf_diename(&cudie);
++		if (!s)
++			s = "";
++		s = strrchr(s, '.');
++		res = s && !strcmp(s, ".c");
++		cache_set(&srcfile_cache, filenum, res);
++		return !!res;
++	}
+ 
+ 	s = dwarf_filesrc(files, filenum, NULL, NULL);
+ 	if (!s)
+diff --git a/scripts/gendwarfksyms/gendwarfksyms.c b/scripts/gendwarfksyms/gendwarfksyms.c
+index 08ae61eb327e..5b6221296dfd 100644
+--- a/scripts/gendwarfksyms/gendwarfksyms.c
++++ b/scripts/gendwarfksyms/gendwarfksyms.c
+@@ -66,8 +66,20 @@ static int process_module(Dwfl_Module *mod, void **userdata, const char *name,
+ 	 */
+ 	do {
+ 		res = dwarf_get_units(dbg, cu, &cu, NULL, NULL, &cudie, NULL);
+-		if (res < 0)
++		if (res < 0) {
++			/*
++			 * sm8750-gendwarfksyms-empty-object: 不产生代码的目标文件（如 rust/bindings.o ——
++			 * 只有 pub use 与 const，实测 992 字节、无 .debug_* 段、
++			 * 无导出符号）本来就没有 .debug_info，dwarf_get_units
++			 * 返回负值属正常情况，不该让整个构建停下。仅在「第一个
++			 * CU 就取不到」时跳过；已有 CU 解析成功后再失败仍报错，
++			 * 以免掩盖真实问题。详见
++			 * scripts/fix-gendwarfksyms-empty-object.py。
++			 */
++			if (!cu)
++				break;
+ 			error("dwarf_get_units failed: no debugging information?");
++		}
+ 		if (res == 1)
+ 			break; /* No more units */
+ 

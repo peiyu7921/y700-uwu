@@ -1,0 +1,163 @@
+diff --git a/Android.bp b/Android.bp
+index 8be8608..a48edb1 100644
+--- a/Android.bp
++++ b/Android.bp
+@@ -32779,3 +32779,158 @@ install_symlink {
+     installed_location: "lib64/libq3dtools_adreno.so",
+     symlink_target: "/vendor/lib64/egl/libq3dtools_adreno.so",
+ }
++
++// sm8750-radio-image: 30 个 bootloader 固件分区各自一个 prebuilt_radio_image 模块。
++// 上游 radio.go:53 早就写好了工厂函数却没注册（见 scripts/register-prebuilt-radio-image.py），
++// 注册后每个分区一个模块，ab_ota_partitions 留空以免触发缺失的 unpack.py。
++// src 必须是相对路径：soong 的 validatePath 拒绝 ../ 与绝对路径。
++
++prebuilt_radio_image {
++    name: "abl",
++    src: "radio/abl.img",
++}
++
++prebuilt_radio_image {
++    name: "aop",
++    src: "radio/aop.img",
++}
++
++prebuilt_radio_image {
++    name: "aop_config",
++    src: "radio/aop_config.img",
++}
++
++prebuilt_radio_image {
++    name: "bluetooth",
++    src: "radio/bluetooth.img",
++}
++
++prebuilt_radio_image {
++    name: "cpucp",
++    src: "radio/cpucp.img",
++}
++
++prebuilt_radio_image {
++    name: "cpucp_dtb",
++    src: "radio/cpucp_dtb.img",
++}
++
++prebuilt_radio_image {
++    name: "devcfg",
++    src: "radio/devcfg.img",
++}
++
++prebuilt_radio_image {
++    name: "dsp",
++    src: "radio/dsp.img",
++}
++
++prebuilt_radio_image {
++    name: "featenabler",
++    src: "radio/featenabler.img",
++}
++
++prebuilt_radio_image {
++    name: "hyp",
++    src: "radio/hyp.img",
++}
++
++prebuilt_radio_image {
++    name: "imagefv",
++    src: "radio/imagefv.img",
++}
++
++prebuilt_radio_image {
++    name: "keymaster",
++    src: "radio/keymaster.img",
++}
++
++prebuilt_radio_image {
++    name: "modem",
++    src: "radio/modem.img",
++}
++
++prebuilt_radio_image {
++    name: "multiimgoem",
++    src: "radio/multiimgoem.img",
++}
++
++prebuilt_radio_image {
++    name: "multiimgqti",
++    src: "radio/multiimgqti.img",
++}
++
++prebuilt_radio_image {
++    name: "pdp",
++    src: "radio/pdp.img",
++}
++
++prebuilt_radio_image {
++    name: "pdp_cdb",
++    src: "radio/pdp_cdb.img",
++}
++
++prebuilt_radio_image {
++    name: "pvmfw",
++    src: "radio/pvmfw.img",
++}
++
++prebuilt_radio_image {
++    name: "qupfw",
++    src: "radio/qupfw.img",
++}
++
++prebuilt_radio_image {
++    name: "qweslicstore",
++    src: "radio/qweslicstore.img",
++}
++
++prebuilt_radio_image {
++    name: "shrm",
++    src: "radio/shrm.img",
++}
++
++prebuilt_radio_image {
++    name: "soccp_dcd",
++    src: "radio/soccp_dcd.img",
++}
++
++prebuilt_radio_image {
++    name: "soccp_debug",
++    src: "radio/soccp_debug.img",
++}
++
++prebuilt_radio_image {
++    name: "spuservice",
++    src: "radio/spuservice.img",
++}
++
++prebuilt_radio_image {
++    name: "tz",
++    src: "radio/tz.img",
++}
++
++prebuilt_radio_image {
++    name: "uefi",
++    src: "radio/uefi.img",
++}
++
++prebuilt_radio_image {
++    name: "uefisecapp",
++    src: "radio/uefisecapp.img",
++}
++
++prebuilt_radio_image {
++    name: "xbl",
++    src: "radio/xbl.img",
++}
++
++prebuilt_radio_image {
++    name: "xbl_config",
++    src: "radio/xbl_config.img",
++}
++
++prebuilt_radio_image {
++    name: "xbl_ramdump",
++    src: "radio/xbl_ramdump.img",
++}

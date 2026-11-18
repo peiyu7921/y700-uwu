@@ -1,0 +1,40 @@
+From 01fd3daf08ee142200e04ae0c9fd5c350bd97103 Mon Sep 17 00:00:00 2001
+From: elden local <local@localhost>
+Date: Mon, 9 Nov 2026 12:37:24 +0800
+Subject: [PATCH] local: work in progress
+
+---
+ config/pixel.mk | 16 +++++++++++++---
+ 1 file changed, 13 insertions(+), 3 deletions(-)
+
+diff --git a/config/pixel.mk b/config/pixel.mk
+index a9aa79e..8a3b8b3 100644
+--- a/config/pixel.mk
++++ b/config/pixel.mk
+@@ -1,10 +1,20 @@
+-WITH_GMS := true
++# GMS
++#
++# Gated behind WITH_GAPPS so a device can ship without Google apps while still getting the
++# Pixel resources below. Devices that never set WITH_GAPPS keep the old behaviour (GMS in).
++ifeq ($(strip $(WITH_GAPPS)),)
++WITH_GAPPS := true
++endif
+ 
+-# Pixel Clocks
+-$(call inherit-product, vendor/pixel/clocks/products/clocks.mk)
++ifeq ($(WITH_GAPPS),true)
++WITH_GMS := true
+ 
+ # Pixel GMS
+ $(call inherit-product, vendor/pixel/gms/products/gms.mk)
++endif
++
++# Pixel Clocks
++$(call inherit-product, vendor/pixel/clocks/products/clocks.mk)
+ 
+ # Pixel GSans
+ $(call inherit-product, vendor/pixel/gsans/products/gsans.mk)
+-- 
+2.55.0.windows.2
+
